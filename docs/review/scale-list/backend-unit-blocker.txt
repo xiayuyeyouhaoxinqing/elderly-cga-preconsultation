@@ -1,0 +1,197 @@
+........................................................................ [ 28%]
+..........................FE
+=================================== ERRORS ====================================
+_____________ ERROR at teardown of test_publish_dialog_turn_event _____________
+
+self = <redis.connection.Connection(host=127.0.0.1,port=6379,db=0)>
+check_health = True, retry_socket_connect = False
+
+    def connect_check_health(
+        self, check_health: bool = True, retry_socket_connect: bool = True
+    ):
+        if self._sock:
+            return
+        # Track actual retry attempts for error reporting
+        actual_retry_attempts = [0]
+    
+        def failure_callback(error, failure_count):
+            actual_retry_attempts[0] = failure_count
+            self.disconnect(error=error, failure_count=failure_count)
+    
+        try:
+            if retry_socket_connect:
+                sock = self.retry.call_with_retry(
+                    self._connect,
+                    failure_callback,
+                    with_failure_count=True,
+                )
+            else:
+>               sock = self._connect()
+                       ^^^^^^^^^^^^^^^
+
+.venv\Lib\site-packages\redis\connection.py:1055: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\redis\connection.py:1617: in _connect
+    raise err
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <redis.connection.Connection(host=127.0.0.1,port=6379,db=0)>
+
+    def _connect(self):
+        "Create a TCP socket connection"
+        # we want to mimic what socket.create_connection does to support
+        # ipv4/ipv6, but we want to set options prior to calling
+        # socket.connect()
+        err = None
+    
+        for res in socket.getaddrinfo(
+            self.host, self.port, self.socket_type, socket.SOCK_STREAM
+        ):
+            family, socktype, proto, canonname, socket_address = res
+            sock = None
+            try:
+                sock = socket.socket(family, socktype, proto)
+                # TCP_NODELAY
+                sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    
+                # TCP_KEEPALIVE
+                if self.socket_keepalive:
+                    sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+                    for k, v in self.socket_keepalive_options.items():
+                        sock.setsockopt(socket.IPPROTO_TCP, k, v)
+    
+                # set the socket_connect_timeout before we connect
+                sock.settimeout(self.socket_connect_timeout)
+    
+                # connect
+>               sock.connect(socket_address)
+E               ConnectionRefusedError: [WinError 10061] ����Ŀ�����������ܾ����޷����ӡ�
+
+.venv\Lib\site-packages\redis\connection.py:1601: ConnectionRefusedError
+
+During handling of the above exception, another exception occurred:
+
+    @pytest.fixture(scope="module")
+    def redis_setup():
+        """��ʼ��Redis�ͻ���"""
+        init_redis(host="localhost", port=6379, db=0)
+        yield
+        # ������������
+        redis = get_redis()
+>       keys = redis.client.keys(b"dialog_stream:test_*")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\unit-test\test_event_publisher.py:33: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+.venv\Lib\site-packages\redis\commands\core.py:3545: in keys
+    return self.execute_command("KEYS", pattern, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\redis\client.py:867: in execute_command
+    return self._execute_command(*args, **options)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\redis\client.py:873: in _execute_command
+    conn = self.connection or pool.get_connection()
+                              ^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\redis\utils.py:258: in wrapper
+    return func(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^
+.venv\Lib\site-packages\redis\connection.py:3273: in get_connection
+    connection.connect()
+.venv\Lib\site-packages\redis\connection.py:1028: in connect
+    self.retry.call_with_retry(
+.venv\Lib\site-packages\redis\retry.py:132: in call_with_retry
+    raise error
+.venv\Lib\site-packages\redis\retry.py:120: in call_with_retry
+    return do()
+           ^^^^
+.venv\Lib\site-packages\redis\connection.py:1029: in <lambda>
+    lambda: self.connect_check_health(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <redis.connection.Connection(host=127.0.0.1,port=6379,db=0)>
+check_health = True, retry_socket_connect = False
+
+    def connect_check_health(
+        self, check_health: bool = True, retry_socket_connect: bool = True
+    ):
+        if self._sock:
+            return
+        # Track actual retry attempts for error reporting
+        actual_retry_attempts = [0]
+    
+        def failure_callback(error, failure_count):
+            actual_retry_attempts[0] = failure_count
+            self.disconnect(error=error, failure_count=failure_count)
+    
+        try:
+            if retry_socket_connect:
+                sock = self.retry.call_with_retry(
+                    self._connect,
+                    failure_callback,
+                    with_failure_count=True,
+                )
+            else:
+                sock = self._connect()
+        except socket.timeout:
+            e = TimeoutError("Timeout connecting to server")
+            record_error_count(
+                server_address=self.host,
+                server_port=self.port,
+                network_peer_address=self.host,
+                network_peer_port=self.port,
+                error_type=e,
+                retry_attempts=actual_retry_attempts[0],
+            )
+            raise e
+        except OSError as e:
+            e = ConnectionError(self._error_message(e))
+            record_error_count(
+                server_address=getattr(self, "host", None),
+                server_port=getattr(self, "port", None),
+                network_peer_address=getattr(self, "host", None),
+                network_peer_port=getattr(self, "port", None),
+                error_type=e,
+                retry_attempts=actual_retry_attempts[0],
+            )
+>           raise e
+E           redis.exceptions.ConnectionError: Error 10061 connecting to 127.0.0.1:6379. ����Ŀ�����������ܾ����޷����ӡ�.
+
+.venv\Lib\site-packages\redis\connection.py:1077: ConnectionError
+------------------------------ Captured log call ------------------------------
+ERROR    app.workers.event_publisher:event_publisher.py:57 �¼�����ʧ��: EventType.DIALOG_TURN -> Error 10061 connecting to 127.0.0.1:6379. ����Ŀ�����������ܾ����޷����ӡ�.
+WARNING  app.workers.event_publisher:event_publisher.py:90 �¼��������棨δʵ�֣�: EventType.DIALOG_TURN
+================================== FAILURES ===================================
+_______________________ test_publish_dialog_turn_event ________________________
+
+redis_setup = None
+
+    def test_publish_dialog_turn_event(redis_setup):
+        """���Է����Ի��ִ��¼�"""
+        session_id = "test_session_001"
+        publisher = DialogEventPublisher(session_id)
+    
+        # �����¼�
+        event = DialogTurnEvent(
+            session_id=session_id,
+            turn_number=1,
+            question="���������Ƕ���?",
+            answer="�ҽ���65�ꡣ",
+            tool_calls=None,
+            metadata={"source": "patient"}
+        )
+    
+        # �����¼�
+        message_id = publisher.publish(event)
+>       assert message_id is not None, "�¼�����ʧ��"
+E       AssertionError: �¼�����ʧ��
+E       assert None is not None
+
+tests\unit-test\test_event_publisher.py:55: AssertionError
+------------------------------ Captured log call ------------------------------
+ERROR    app.workers.event_publisher:event_publisher.py:57 �¼�����ʧ��: EventType.DIALOG_TURN -> Error 10061 connecting to 127.0.0.1:6379. ����Ŀ�����������ܾ����޷����ӡ�.
+WARNING  app.workers.event_publisher:event_publisher.py:90 �¼��������棨δʵ�֣�: EventType.DIALOG_TURN
+=========================== short test summary info ===========================
+FAILED tests/unit-test/test_event_publisher.py::test_publish_dialog_turn_event
+ERROR tests/unit-test/test_event_publisher.py::test_publish_dialog_turn_event
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 2 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 98 passed, 1 error in 60.70s (0:01:00)

@@ -38,6 +38,7 @@ const navigation = [
   { name: '任务管理', href: '/nurse/tasks', icon: ClipboardDocumentListIcon },
   { name: '实时监控', href: '/nurse/monitor', icon: ComputerDesktopIcon },
   { name: 'AI质评', href: '/nurse/quality', icon: StarIcon },
+  { name: '已发布量表', href: '/nurse/scales', icon: ClipboardDocumentListIcon },
   { name: '系统配置', href: '/nurse/config', icon: Cog6ToothIcon },
 ];
 

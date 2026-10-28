@@ -20,7 +20,7 @@ from app.schemas.scale import AssessmentScaleDto
 logger = logging.getLogger(__name__)
 
 
-def list_published_scales(db: Session) -> list[AssessmentScaleDto]:
+def list_published_scales(db: Session, keyword: str | None = None) -> list[AssessmentScaleDto]:
     """查询已发布量表列表
     作用：返回当前生效且已发布的量表版本，含非衍生题目计数，供前端量表选择使用。
     Args:
@@ -52,6 +52,13 @@ def list_published_scales(db: Session) -> list[AssessmentScaleDto]:
         .subquery()
     )
 
+    # 转义LIKE通配符，用户输入仅作为量表名称的文字子串。
+    name_filter = (
+        AssessmentScale.scale_name.icontains(keyword.strip(), autoescape=True)
+        if keyword and keyword.strip()
+        else True
+    )
+
     # 主查询：量表 JOIN 生效版本
     scale_rows = list(
         db.execute(
@@ -64,7 +71,7 @@ def list_published_scales(db: Session) -> list[AssessmentScaleDto]:
                 AssessmentScaleVersion,
                 AssessmentScaleVersion.id == active_version_subq.c.version_id,
             )
-            .where(AssessmentScale.deleted == 0)
+            .where(AssessmentScale.deleted == 0, name_filter)
             .order_by(AssessmentScale.id.asc())
         ).all()
     )

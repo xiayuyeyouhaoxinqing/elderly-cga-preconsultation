@@ -484,6 +484,8 @@ export function mapStaffUser(response: StaffLoginResponse): User {
 export function mapAssessmentScale(dto: AssessmentScaleDto): AssessmentScale {
   return {
     id: id(dto.id),
+    versionCode: dto.version_code,
+    questionCount: dto.question_count,
     scaleCode: dto.scale_code,
     scaleName: dto.scale_name,
     scaleType: dto.scale_type,

@@ -170,6 +170,8 @@ export interface CareTask {
 
 // 量表配置
 export interface AssessmentScale {
+  versionCode?: string;
+  questionCount?: number;
   id: string;
   scaleCode: string;
   scaleName: string;

@@ -427,8 +427,10 @@ export class ApiCareRepository implements CareRepository {
     return mapPatientRecord(response);
   }
 
-  async listScales(signal?: AbortSignal): Promise<AssessmentScale[]> {
-    const response = await apiRequest<AssessmentScaleDto[]>('/api/scales', {
+  async listScales(signal?: AbortSignal, filters?: { keyword?: string }): Promise<AssessmentScale[]> {
+    const keyword = filters?.keyword?.trim();
+    const path = keyword ? `/api/scales?${new URLSearchParams({ keyword })}` : '/api/scales';
+    const response = await apiRequest<AssessmentScaleDto[]>(path, {
       signal,
     });
     return response.map(mapAssessmentScale);

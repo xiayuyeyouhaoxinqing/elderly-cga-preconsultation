@@ -1,4 +1,9 @@
 # AGENTS.md
+
+## 本次列表功能试验补充
+
+本组工程规范见根目录 `AGENT.md`，已在本次编码前读取。当前功能分支仅处理已发布量表列表，执行及测试交接见 `TESTING_SCALE_LIST.md`。本次由用户授权直接开发并交付测试；保留独立功能分支，不自动合并、推送或删除分支。模块说明继续适用于相应目录，历史约定与本次明确授权冲突时按用户要求执行。
+
 This file provides guidance to AI coding agents (Claude Code, Codex, and others) when working with code in this repository. It is the source of truth; the sibling `CLAUDE.md` imports it via `@AGENTS.md`.
 
 It is the **monorepo orientation layer**: it maps the whole repo and points to the

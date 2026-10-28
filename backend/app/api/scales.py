@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_staff
@@ -27,6 +27,7 @@ router = APIRouter(prefix="/api/scales", tags=["scales"])
 def list_published_scales(
     db: Annotated[Session, Depends(get_db)],
     _: Annotated[StaffAccount, Depends(require_staff)],
+    keyword: Annotated[str | None, Query(max_length=50)] = None,
 ) -> dict:
     """查询已发布量表列表
     作用：返回当前生效且已发布的量表版本，含非衍生题目计数。
@@ -35,4 +36,4 @@ def list_published_scales(
     Return:
         - 已发布量表列表
     """
-    return ok(scale_service.list_published_scales(db))
+    return ok(scale_service.list_published_scales(db, keyword=keyword))

@@ -577,9 +577,12 @@ export class MockCareRepository implements CareRepository {
     return buildMockPatientRecord(record.patient, record.encounter);
   }
 
-  async listScales(signal?: AbortSignal) {
+  async listScales(signal?: AbortSignal, filters?: { keyword?: string }) {
     await wait(signal);
-    return mockScales;
+    const keyword = filters?.keyword?.trim().toLocaleLowerCase();
+    return structuredClone(keyword
+      ? mockScales.filter((scale) => scale.scaleName.toLocaleLowerCase().includes(keyword))
+      : mockScales);
   }
 
   async listEducationMaterials(signal?: AbortSignal) {

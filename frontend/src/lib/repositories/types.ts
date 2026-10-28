@@ -223,7 +223,7 @@ export interface CareRepository {
     input: PatientRecordInput,
     signal?: AbortSignal
   ): Promise<PatientWithEncounter>;
-  listScales(signal?: AbortSignal): Promise<AssessmentScale[]>;
+  listScales(signal?: AbortSignal, filters?: { keyword?: string }): Promise<AssessmentScale[]>;
   listEducationMaterials(
     signal?: AbortSignal
   ): Promise<EducationMaterialConfig[]>;
