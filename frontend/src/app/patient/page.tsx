@@ -48,7 +48,6 @@ function PatientVerifyContent() {
   const searchParams = useSearchParams();
   const { tasks, setTasks, updateTask } = useTaskStore();
   const { login } = useUserStore();
-  const [taskNo, setTaskNo] = useState(() => searchParams.get('taskNo') ?? '');
   const [idCardNo, setIdCardNo] = useState('');
   const [phone, setPhone] = useState('');
   const [encounterKind, setEncounterKind] = useState<'inpatient' | 'outpatient'>('outpatient');
@@ -65,10 +64,10 @@ function PatientVerifyContent() {
         ? item.collectionMode === 'ai_dialogue'
         : item.collectionMode === 'traditional_form'
     );
-    if (!task) return;
-    const patient = mockPatients.find((item) => item.id === task.patientId);
-    setTaskNo(task.taskNo);
-    setIdCardNo(patient?.idCard ?? '');
+    const account = task && patientDemoAccounts.find((item) => item.mockPatientId === task.patientId);
+    if (!account) return;
+    setIdCardNo(account.idCardNo);
+    setPhone(account.phone);
     setError('');
   };
 
@@ -106,33 +105,29 @@ function PatientVerifyContent() {
 
     await new Promise((resolve) => setTimeout(resolve, 450));
 
-    const task = tasks.find((item) => item.taskNo.toLowerCase() === taskNo.trim().toLowerCase());
-    const patient = task
-      ? mockPatients.find((item) => item.id === task.patientId)
-      : undefined;
-
-    if (!task || !patient) {
-      setError('没有找到该任务，请检查任务编号');
+    const account = patientDemoAccounts.find((item) =>
+      item.mockPatientId && item.idCardNo === idCardNo.trim().toUpperCase() && item.phone === phone.trim()
+    );
+    const patient = account && mockPatients.find((item) => item.id === account.mockPatientId);
+    if (!patient) {
+      setError('身份证号或登记手机号不匹配，请使用演示信息');
       setLoading(false);
       return;
     }
 
-    if (patient.idCard !== idCardNo.trim()) {
-      setError('证件后四位与任务患者不匹配');
-      setLoading(false);
-      return;
+    const task = tasks.find((item) => item.patientId === patient.id);
+    if (task) {
+      updateTask(task.id, {
+        participantType,
+        participantName: participantType === 'patient' ? patient.name : `${patient.name}家属`,
+        relationshipToPatient: participantType === 'family' ? relationship : undefined,
+      });
     }
-
-    updateTask(task.id, {
-      participantType,
-      participantName: participantType === 'patient' ? patient.name : `${patient.name}家属`,
-      relationshipToPatient: participantType === 'family' ? relationship : undefined,
-    });
     login({
       id: patient.id,
       role: 'patient',
       name: patient.name,
-      department: task.department,
+      department: task?.department,
     });
     router.push('/patient/tasks');
   };
@@ -169,7 +164,7 @@ function PatientVerifyContent() {
           <p className="text-foreground-muted">患者服务</p>
           <h1 className="mt-1 text-3xl font-semibold">患者身份核验</h1>
           <p className="mt-2 text-lg text-foreground-muted">
-            {apiMode ? '请填写就诊登记信息，核验后查看本人任务。' : '这是演示环境。可以填入示例任务，体验患者流程。'}
+            {apiMode ? '请填写就诊登记信息，核验后查看本人任务。' : '这是演示环境。可填入示例身份证号和手机号体验，请勿填写真实个人信息。'}
           </p>
         </header>
         <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
@@ -203,24 +198,16 @@ function PatientVerifyContent() {
                 </div>
               </fieldset>
             )}
-            {!apiMode && (
-              <label className="block font-medium">
-                <span className="mb-2 block">任务编号</span>
-                <input className="cga-field" value={taskNo} onChange={(event) => setTaskNo(event.target.value)} required />
-              </label>
-            )}
             <label className="block font-medium">
-              <span className="mb-2 block">{apiMode ? '身份证号' : '证件号后四位'}</span>
+              <span className="mb-2 block">身份证号</span>
               <input className="cga-field" value={idCardNo} onChange={(event) => setIdCardNo(event.target.value)}
-                maxLength={apiMode ? 18 : 4} inputMode={apiMode ? 'text' : 'numeric'} required />
+                maxLength={18} required />
             </label>
-            {apiMode && (
-              <label className="block font-medium">
-                <span className="mb-2 block">登记手机号</span>
-                <input className="cga-field" type="tel" autoComplete="tel" value={phone}
-                  onChange={(event) => setPhone(event.target.value)} maxLength={20} required />
-              </label>
-            )}
+            <label className="block font-medium">
+              <span className="mb-2 block">登记手机号</span>
+              <input className="cga-field" type="tel" autoComplete="tel" value={phone}
+                onChange={(event) => setPhone(event.target.value)} maxLength={20} required />
+            </label>
             {!apiMode && participantType === 'family' && (
               <label className="block font-medium">
                 <span className="mb-2 block">与患者关系</span>
