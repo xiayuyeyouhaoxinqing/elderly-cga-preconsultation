@@ -161,7 +161,7 @@ function PatientVerifyContent() {
 
   return (
     <main className="cga-screen min-h-dvh px-5 py-6 sm:py-10">
-      <div className="mx-auto max-w-lg">
+      <div className="cga-interaction mx-auto max-w-lg md:max-w-xl">
         <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">返回身份选择</Link>
         <header className="mt-4 mb-6 border-l-4 border-primary pl-4">
           <p className="text-foreground-muted">患者服务</p>

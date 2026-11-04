@@ -38,7 +38,7 @@ export default function NurseLoginPage() {
 
   return (
     <main className="cga-screen min-h-dvh px-5 py-8 sm:py-14">
-      <div className="mx-auto max-w-md">
+      <div className="cga-interaction mx-auto max-w-md md:max-w-lg">
         <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">
           返回身份选择
         </Link>

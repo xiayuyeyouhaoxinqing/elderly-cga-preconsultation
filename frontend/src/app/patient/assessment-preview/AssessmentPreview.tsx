@@ -31,7 +31,7 @@ export function AssessmentPreview() {
 
   return (
     <main className="cga-screen min-h-dvh">
-      <div className={`mx-auto w-full max-w-2xl px-5 py-6 sm:px-8 sm:py-10 ${largeText ? 'text-xl' : 'text-lg'}`}>
+      <div className={`cga-interaction mx-auto w-full max-w-2xl px-5 py-6 sm:px-8 sm:py-10 ${largeText ? 'text-xl' : 'text-lg'}`}>
       <header className="mb-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
           <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">返回首页</Link>

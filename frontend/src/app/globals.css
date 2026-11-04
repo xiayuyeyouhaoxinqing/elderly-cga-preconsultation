@@ -2,22 +2,23 @@
 
 :root {
   /* 背景色 */
-  --background: #F7F4EF;
+  --background: #f3f7fc;
   --surface: #FFFFFF;
-  --surface-secondary: #FBF9F5;
+  --surface-secondary: #eaf2fc;
 
   /* 文本色 */
-  --foreground: #1F2421;
-  --foreground-muted: #5C635D;
-  --foreground-placeholder: #BFBFBF;
+  --foreground: #142843;
+  --foreground-muted: #465b75;
+  --foreground-placeholder: #596d87;
 
   /* 边框色 */
-  --border: #E7E1D7;
+  --border: #ccd9eb;
 
   /* 功能色 */
-  --primary: #C4612F;
-  --primary-hover: #A94E22;
-  --primary-tint: #F2E3D6;
+  --primary: #1856a3;
+  --primary-hover: #123c78;
+  --primary-tint: #deebfd;
+  --field-border: #8198b5;
 
   --success: #52C41A;
   --warning: #FAAD14;
@@ -50,18 +51,16 @@
 }
 
 .cga-screen {
-  --background: #f3f6f5;
-  --surface: #fff;
-  --surface-secondary: #eaf2ef;
-  --foreground: #162c28;
-  --foreground-muted: #485c57;
-  --foreground-placeholder: #586d66;
-  --border: #cbdad5;
-  --primary: #146353;
-  --primary-hover: #0b4d40;
-  --primary-tint: #e0f0ea;
   color: var(--foreground);
   background: var(--background);
+}
+
+.cga-screen h1,
+.cga-screen h2 {
+  font-family: var(--font-sans);
+  letter-spacing: normal;
+  font-weight: 600;
+  overflow-wrap: break-word;
 }
 
 .cga-screen :focus-visible {
@@ -72,7 +71,7 @@
 .cga-field {
   width: 100%;
   min-height: 3rem;
-  border: 1px solid #829c93;
+  border: 1px solid var(--field-border);
   border-radius: .5rem;
   padding: .625rem .875rem;
   background: var(--surface);
@@ -82,6 +81,21 @@
 
 .cga-field::placeholder {
   color: var(--foreground-placeholder);
+}
+
+/* 大尺寸触屏使用同一服务入口，放宽表单并提高触控目标。 */
+@media (min-width: 1000px) and (pointer: coarse) {
+  .cga-screen .cga-interaction {
+    max-width: 48rem;
+  }
+
+  .cga-screen :is(button, .cga-field, .cga-touch-link) {
+    min-height: 3.75rem;
+  }
+
+  .cga-screen :is(button, .cga-field, .cga-touch-link, label) {
+    font-size: 1.125rem;
+  }
 }
 
 body {
@@ -158,25 +172,13 @@ h1, h2 {
 
 /* 患者端视觉系统：仅在 PatientLayout 内覆盖，避免影响医护端。 */
 .patient-app {
-  --background: #f7f4ef;
-  --surface: #ffffff;
-  --surface-secondary: #fbf9f5;
-  --foreground: #2f2925;
-  --foreground-muted: #756d66;
-  --foreground-placeholder: #a9a09a;
-  --border: #e8dcd1;
-  --primary: #ff6041;
-  --primary-hover: #df472d;
-  --primary-tint: #fff0e8;
   --success: #3dad82;
   --warning: #e5a146;
   --danger: #d95a4a;
   --info: #5b8def;
   min-height: 100dvh;
   color: var(--foreground);
-  background:
-    radial-gradient(circle at 8% 2%, rgb(255 255 255 / 82%), transparent 24rem),
-    #ebe6de;
+  background: var(--surface-secondary);
   font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 }
 
@@ -189,14 +191,11 @@ h1, h2 {
 .patient-mobile-frame {
   position: relative;
   width: 100%;
-  max-width: 430px;
+  max-width: 48rem;
   min-height: 100dvh;
   margin-inline: auto;
   overflow-x: clip;
-  background:
-    radial-gradient(circle at 85% 3%, rgb(255 240 227 / 70%), transparent 16rem),
-    var(--background);
-  box-shadow: 0 0 48px rgb(79 57 42 / 14%);
+  background: var(--background);
 }
 
 .patient-page-content {
@@ -308,11 +307,10 @@ h1, h2 {
   justify-content: center;
   gap: 8px;
   border-radius: 16px;
-  background: linear-gradient(135deg, #ff6848 0%, #ff5133 100%);
+  background: var(--primary);
   color: #fff;
   font-size: 17px;
   font-weight: 800;
-  box-shadow: 0 10px 20px rgb(255 86 52 / 20%);
   transition: filter 160ms ease, transform 160ms ease;
 }
 
