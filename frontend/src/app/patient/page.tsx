@@ -4,7 +4,8 @@ import { Suspense, useState } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import PatientLayout from '@/components/layout/PatientLayout';
-import { PatientIcon } from '@/components/patient/PatientIcon';
+import Link from 'next/link';
+import { Button } from '@/components/shared/Button';
 import { careRepository } from '@/lib/repositories';
 import { runtimeConfig } from '@/lib/runtime/config';
 import { useTaskStore } from '@/lib/stores/useTaskStore';
@@ -159,259 +160,102 @@ function PatientVerifyContent() {
   };
 
   return (
-    <PatientLayout>
-      <div className="relative min-h-screen overflow-hidden px-[18px] pb-8 pt-9">
-        <div
-          className="pointer-events-none absolute inset-x-0 top-28 h-44 opacity-70"
-          aria-hidden="true"
-          style={{
-            background:
-              'radial-gradient(ellipse at 20% 70%, #ffe8d5 0 26%, transparent 27%), radial-gradient(ellipse at 72% 70%, #fff0df 0 34%, transparent 35%)',
-          }}
-        />
-
-        <div className="relative z-10 pt-2 text-center">
-          <PatientIcon
-            name="brand-heart-cross"
-            className="mx-auto h-[92px] w-[92px] text-primary"
-          />
-          <h1 className="mt-5 text-[32px] font-black leading-tight text-[#4a241c]">
-            进入护理服务
-          </h1>
-          <div className="mt-3 flex items-center justify-center gap-3">
-            <span className="h-px w-16 bg-[#efc9ae]" />
-            <p className="text-lg font-bold">患者身份核验</p>
-            <span className="h-px w-16 bg-[#efc9ae]" />
-          </div>
-
-          <div className="patient-card mt-6 overflow-hidden p-4">
-            <form onSubmit={handleVerify} className="space-y-5">
-              <div className="grid grid-cols-2 rounded-2xl border border-[#f0d6c3] bg-[#fffaf5] p-1">
-                {(
-                  [
-                    ['patient', '患者本人'],
-                    ['family', '家属协助'],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setParticipantType(value)}
-                    className={`min-h-12 rounded-[14px] text-[16px] font-bold transition ${
-                      participantType === value
-                        ? 'bg-gradient-to-r from-[#ff6949] to-[#ff5133] text-white shadow-sm'
-                        : 'text-foreground-muted'
-                    }`}
-                    aria-pressed={participantType === value}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              {!apiMode && (
-                <label className="patient-field flex items-center gap-3 px-4">
-                  <PatientIcon name="clipboard" className="text-[#8e745f]" />
-                  <span className="shrink-0 text-[16px] font-bold">任务编号</span>
-                  <input
-                    value={taskNo}
-                    onChange={(event) => setTaskNo(event.target.value)}
-                    placeholder="请输入任务编号"
-                    className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-foreground-placeholder"
-                    required
-                  />
-                </label>
-              )}
-
-              <label className="patient-field flex items-center gap-3 px-4">
-                <PatientIcon name="user" className="text-[#8e745f]" />
-                <span className="shrink-0 text-[17px] font-bold">
-                  {apiMode ? '身份证号' : '证件号后四位'}
-                </span>
-                <input
-                  value={idCardNo}
-                  onChange={(event) => setIdCardNo(event.target.value)}
-                  placeholder={apiMode ? '请输入身份证号' : '请输入后四位'}
-                  maxLength={apiMode ? 18 : 4}
-                  className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-foreground-placeholder"
-                  required
-                />
-              </label>
-
-              {apiMode && (
-                <label className="patient-field flex items-center gap-3 px-4">
-                  <PatientIcon name="phone" className="text-[#8e745f]" />
-                  <span className="shrink-0 text-[16px] font-bold">手机号</span>
-                  <input
-                    value={phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    placeholder="请输入登记手机号"
-                    maxLength={20}
-                    className="min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-foreground-placeholder"
-                    required
-                  />
-                </label>
-              )}
-
-              {participantType === 'family' && (
-                <label className="patient-field flex items-center gap-3 px-4">
-                  <PatientIcon name="family" className="text-[#8e745f]" />
-                  <span className="shrink-0 text-[16px] font-bold">与患者关系</span>
-                  <select
-                    value={relationship}
-                    onChange={(event) => setRelationship(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-right text-[15px] outline-none"
-                  >
-                    <option>女儿</option>
-                    <option>儿子</option>
-                    <option>配偶</option>
-                    <option>其他家属</option>
-                  </select>
-                </label>
-              )}
-
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-left text-sm text-red-700"
-                >
-                  {error}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="patient-primary-button w-full"
-              >
-                <PatientIcon name="shield" className="h-5 w-5" />
-                {loading ? '正在核验…' : '核验并进入'}
-              </button>
-            </form>
-
-            <div className="my-4 flex items-center gap-3">
-              <span className="h-px flex-1 bg-border" />
-              <span className="text-xs text-foreground-muted">
-                {apiMode ? '联调演示身份' : '快速体验'}
-              </span>
-              <span className="h-px flex-1 bg-border" />
-            </div>
-
-            {apiMode ? (
-              <>
+    <main className="cga-screen min-h-dvh px-5 py-6 sm:py-10">
+      <div className="mx-auto max-w-lg">
+        <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">返回身份选择</Link>
+        <header className="mt-4 mb-6 border-l-4 border-primary pl-4">
+          <p className="text-foreground-muted">患者服务</p>
+          <h1 className="mt-1 text-3xl font-semibold">患者身份核验</h1>
+          <p className="mt-2 text-lg text-foreground-muted">
+            {apiMode ? '请填写就诊登记信息，核验后查看本人任务。' : '这是演示环境。可以填入示例任务，体验患者流程。'}
+          </p>
+        </header>
+        <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
+          <form onSubmit={handleVerify} className="space-y-5">
+            {!apiMode && (
+              <fieldset>
+                <legend className="mb-2 font-semibold">由谁填写</legend>
                 <div className="grid grid-cols-2 gap-2">
-                {patientDemoAccounts.slice(0, 2).map((account) => (
-                    <button
-                      key={account.idCardNo}
-                      type="button"
-                      onClick={() => {
-                        setIdCardNo(account.idCardNo);
-                        setPhone(account.phone);
-                        setError('');
-                      }}
-                      className="patient-outline-button min-h-11 text-sm"
-                    >
-                      填充{account.name}
+                  {([['patient', '患者本人'], ['family', '家属协助']] as const).map(([value, label]) => (
+                    <button key={value} type="button" aria-pressed={participantType === value}
+                      onClick={() => setParticipantType(value)}
+                      className="min-h-12 cursor-pointer rounded-lg border border-border px-2 font-medium aria-pressed:border-primary aria-pressed:bg-primary-tint aria-pressed:text-primary-hover">
+                      {label}
                     </button>
                   ))}
                 </div>
-                {patientDemoAccounts.length > 2 && (
-                  <details className="mt-2 rounded-2xl bg-[#fffaf5] px-3 py-2 text-sm">
-                    <summary className="cursor-pointer font-bold text-foreground-muted">
-                      更多联调演示身份
-                    </summary>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {patientDemoAccounts.slice(2).map((account) => (
-                        <button
-                          key={account.idCardNo}
-                          type="button"
-                          onClick={() => {
-                            setIdCardNo(account.idCardNo);
-                            setPhone(account.phone);
-                            setError('');
-                          }}
-                          className="min-h-10 rounded-xl border border-[#efc9ae] bg-white px-2 text-xs font-bold text-primary"
-                        >
-                          填充{account.name}
-                        </button>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </>
-            ) : (
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  className="patient-outline-button min-h-11 text-sm"
-                  onClick={() => fillDemo('ai')}
-                >
-                  AI 对话任务
-                </button>
-                <button
-                  type="button"
-                  className="patient-outline-button min-h-11 text-sm"
-                  onClick={() => fillDemo('form')}
-                >
-                  传统问卷任务
-                </button>
+              </fieldset>
+            )}
+            {!apiMode && (
+              <label className="block font-medium">
+                <span className="mb-2 block">任务编号</span>
+                <input className="cga-field" value={taskNo} onChange={(event) => setTaskNo(event.target.value)} required />
+              </label>
+            )}
+            <label className="block font-medium">
+              <span className="mb-2 block">{apiMode ? '身份证号' : '证件号后四位'}</span>
+              <input className="cga-field" value={idCardNo} onChange={(event) => setIdCardNo(event.target.value)}
+                maxLength={apiMode ? 18 : 4} inputMode={apiMode ? 'text' : 'numeric'} required />
+            </label>
+            {apiMode && (
+              <label className="block font-medium">
+                <span className="mb-2 block">登记手机号</span>
+                <input className="cga-field" type="tel" autoComplete="tel" value={phone}
+                  onChange={(event) => setPhone(event.target.value)} maxLength={20} required />
+              </label>
+            )}
+            {!apiMode && participantType === 'family' && (
+              <label className="block font-medium">
+                <span className="mb-2 block">与患者关系</span>
+                <select className="cga-field" value={relationship} onChange={(event) => setRelationship(event.target.value)}>
+                  <option>女儿</option><option>儿子</option><option>配偶</option><option>其他家属</option>
+                </select>
+              </label>
+            )}
+            {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800">{error}</p>}
+            <Button type="submit" loading={loading} className="min-h-13 w-full rounded-lg shadow-none hover:translate-y-0 hover:shadow-none">
+              {loading ? '正在核验…' : '核验并进入'}
+            </Button>
+          </form>
+          {!apiMode && (
+            <div className="mt-5 border-t border-border pt-4">
+              <p className="mb-2 font-medium">填入演示信息</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-11 rounded-lg" onClick={() => fillDemo('form')}>传统问卷任务</Button>
+                <Button type="button" variant="outline" className="min-h-11 rounded-lg" onClick={() => fillDemo('ai')}>AI 对话任务</Button>
               </div>
-            )}
-
-            <button
-              type="button"
-              className="patient-outline-button mt-3 w-full"
-              onClick={() => {
-                setScanOpen((current) => !current);
-                setError('');
-              }}
-            >
-              <PatientIcon name="qr" />
-              {scanOpen ? '关闭扫码核验' : '扫码进入'}
-            </button>
-
-            {scanOpen && (
-              <form
-                onSubmit={handleScanVerify}
-                className="mt-3 rounded-2xl border border-[#f0d6c3] bg-[#fffaf5] p-3 text-left"
-              >
-                <label className="text-sm font-bold text-foreground-muted">
-                  扫码后粘贴院内一次性令牌
-                  <input
-                    value={scanToken}
-                    onChange={(event) => setScanToken(event.target.value)}
-                    placeholder="等待二维码内容…"
-                    className="patient-field mt-2 w-full px-3 text-sm outline-none"
-                    minLength={24}
-                    required
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="patient-primary-button mt-3 w-full"
-                >
-                  {loading ? '正在核验…' : '核验扫码令牌'}
-                </button>
-                <p className="mt-2 text-xs leading-5 text-foreground-muted">
-                  相机权限未开启时可粘贴二维码内容；令牌只能使用一次，过期后请联系护士重新生成。
-                </p>
-              </form>
-            )}
-          </div>
-
-          <p className="mt-4 flex items-center justify-center gap-2 text-sm text-foreground-muted">
-            <PatientIcon name="shield" className="h-4 w-4" />
-            信息仅用于护理评估
-          </p>
-
-          {apiMode && (
-            <div className="mt-3 rounded-2xl bg-[#edf6ff] p-3 text-left text-xs leading-5 text-[#3c6594]">
-              身份证号和手机号仅用于确认本次住院身份；登录后由患者专用接口加载本人护理任务。
             </div>
           )}
-        </div>
+          {apiMode && process.env.NODE_ENV === 'development' && (
+            <details className="mt-5 border-t border-border pt-4">
+              <summary className="min-h-11 cursor-pointer text-primary-hover">联调演示身份</summary>
+              <div className="flex flex-wrap gap-2">
+                {patientDemoAccounts.map((account) => (
+                  <Button key={account.idCardNo} type="button" variant="outline" className="min-h-11 rounded-lg"
+                    onClick={() => { setIdCardNo(account.idCardNo); setPhone(account.phone); setError(''); }}>
+                    填充{account.name}
+                  </Button>
+                ))}
+              </div>
+            </details>
+          )}
+          <Button type="button" variant="outline" className="mt-3 min-h-11 rounded-lg"
+            aria-expanded={scanOpen} onClick={() => { setScanOpen((current) => !current); setError(''); }}>
+            {scanOpen ? '收起扫码核验' : '使用扫码令牌'}
+          </Button>
+          {scanOpen && (
+            <form onSubmit={handleScanVerify} className="mt-3 space-y-3 rounded-lg bg-surface-secondary p-4">
+              <label className="block font-medium">
+                <span className="mb-2 block">院内一次性令牌</span>
+                <input value={scanToken} onChange={(event) => setScanToken(event.target.value)} className="cga-field" minLength={24} required />
+              </label>
+              <p className="text-foreground-muted">请粘贴二维码中的令牌。过期后可请护士重新生成。</p>
+              <Button type="submit" loading={loading} className="min-h-11 rounded-lg">{loading ? '正在核验…' : '核验扫码令牌'}</Button>
+            </form>
+          )}
+        </section>
+        <p className="mt-4 text-foreground-muted">需要帮助时，可请现场工作人员协助。</p>
       </div>
-    </PatientLayout>
+    </main>
   );
 }

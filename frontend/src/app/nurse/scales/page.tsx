@@ -7,6 +7,9 @@ import { isRequestCancelled } from '@/lib/api/httpClient';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { runtimeConfig } from '@/lib/runtime/config';
 import type { AssessmentScale } from '@/lib/types';
+import { Button } from '@/components/shared/Button';
+
+const columns = ['量表名称', '编码', '类型', '版本', '非派生题目数'];
 
 export default function PublishedScalesPage() {
   const user = useUserStore((state) => state.user);
@@ -42,31 +45,51 @@ export default function PublishedScalesPage() {
     setQuery((previous) => ({ keyword: input.trim(), revision: previous.revision + 1 }));
   }
 
-  return <NurseLayout>
-    <h1 className="text-2xl font-semibold mb-3">已发布量表</h1>
-    <p className="mb-5 text-foreground-muted">只读查询当前生效的已发布量表。当前数据模式：{runtimeConfig.dataMode === 'mock' ? 'Mock演示' : 'API服务'}。</p>
-    {user?.role === 'nurse' && <>
-      <form onSubmit={search} className="flex flex-wrap gap-3 mb-5 items-end">
-        <label className="flex flex-col gap-2">量表名称
-          <input className="border rounded-lg p-3" value={input} maxLength={50}
-            onChange={(event) => setInput(event.target.value)} placeholder="输入名称关键词" />
-        </label>
-        <button className="border rounded-lg p-3 disabled:opacity-50" disabled={loading} type="submit">查询</button>
-        <button className="border rounded-lg p-3 disabled:opacity-50" disabled={loading} type="button"
-          onClick={() => { setInput(''); setLoading(true); setQuery((previous) => ({ keyword: '', revision: previous.revision + 1 })); }}>清空</button>
-      </form>
-      <div aria-live="polite" aria-busy={loading}>
-        {loading ? <p role="status">正在加载…</p> : error ? <p role="alert">加载失败：{error}。请点击查询重试。</p> : scales.length === 0 ? <p>暂无匹配的已发布量表。</p> :
-          <div className="overflow-x-auto"><table className="w-full min-w-[680px] text-left border-collapse">
-            <caption className="text-left mb-3">共 {scales.length} 项</caption>
-            <thead><tr>{['量表名称', '编码', '类型', '版本', '非派生题目数'].map((title) => <th scope="col" className="border p-3" key={title}>{title}</th>)}</tr></thead>
-            <tbody>{scales.map((scale) => <tr key={scale.id}>
-              <td className="border p-3">{scale.scaleName}</td><td className="border p-3">{scale.scaleCode}</td>
-              <td className="border p-3">{scale.scaleType}</td><td className="border p-3">{scale.versionCode ?? '未提供'}</td>
-              <td className="border p-3">{scale.questionCount ?? '未提供'}</td>
-            </tr>)}</tbody>
-          </table></div>}
+  return (
+    <NurseLayout>
+      <div className="cga-screen rounded-xl p-4 sm:p-6">
+        <header className="mb-5 border-l-4 border-primary pl-4">
+          <p className="mb-1 text-foreground-muted">职工工作台 · 量表管理</p>
+          <h1 className="text-3xl font-semibold">已发布量表</h1>
+          <p className="mt-2 text-foreground-muted">查看当前生效的量表版本。{runtimeConfig.dataMode === 'mock' && '当前显示演示数据。'}</p>
+        </header>
+        {user?.role === 'nurse' && (
+          <>
+            <form onSubmit={search} className="mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface p-4">
+              <label className="w-full max-w-sm font-medium sm:flex-1">
+                <span className="mb-2 block">量表名称</span>
+                <input className="cga-field" value={input} maxLength={50}
+                  onChange={(event) => setInput(event.target.value)} placeholder="例如：营养" />
+              </label>
+              <Button className="min-h-12 rounded-lg shadow-none hover:translate-y-0 hover:shadow-none" disabled={loading} type="submit">查询</Button>
+              <Button className="min-h-12 rounded-lg" variant="outline" disabled={loading} type="button"
+                onClick={() => { setInput(''); setLoading(true); setQuery((previous) => ({ keyword: '', revision: previous.revision + 1 })); }}>清空</Button>
+            </form>
+            <div aria-live="polite" aria-busy={loading} className="rounded-xl border border-border bg-surface">
+              {loading ? <p className="p-4" role="status">正在加载…</p> : error ? <p className="p-4 text-red-800" role="alert">加载失败：{error}。请点击查询重试。</p> : scales.length === 0 ? <p className="p-4">暂无匹配的已发布量表。</p> : (
+                <table role="table" className="block w-full table-fixed border-collapse text-left lg:table">
+                  <caption className="block px-4 py-3 text-left font-medium lg:table-caption">共 {scales.length} 项</caption>
+                  <thead role="rowgroup" className="sr-only lg:not-sr-only lg:table-header-group">
+                    <tr role="row">{columns.map((title) => <th scope="col" role="columnheader" className="bg-surface-secondary p-3 text-sm first:w-[31%]" key={title}>{title}</th>)}</tr>
+                  </thead>
+                  <tbody role="rowgroup" className="block lg:table-row-group">
+                    {scales.map((scale) => (
+                      <tr role="row" key={scale.id} className="grid grid-cols-2 gap-x-3 border-t border-border px-4 py-3 lg:table-row lg:p-0">
+                        {[scale.scaleName, scale.scaleCode, scale.scaleType, scale.versionCode ?? '未提供', scale.questionCount ?? '未提供'].map((value, index) => (
+                          <td role="cell" key={columns[index]} className="min-w-0 py-2 break-words first:col-span-2 first:font-semibold lg:p-3">
+                            {index > 0 && <span aria-hidden="true" className="block text-sm text-foreground-muted lg:hidden">{columns[index]}</span>}
+                            {value}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </>
+        )}
       </div>
-    </>}
-  </NurseLayout>;
+    </NurseLayout>
+  );
 }

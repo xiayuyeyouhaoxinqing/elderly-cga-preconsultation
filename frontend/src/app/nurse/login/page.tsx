@@ -37,24 +37,26 @@ export default function NurseLoginPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-md px-5 py-10 sm:py-16">
+    <main className="cga-screen min-h-dvh px-5 py-8 sm:py-14">
+      <div className="mx-auto max-w-md">
         <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">
           返回身份选择
         </Link>
-        <div className="mt-6 mb-6">
-          <p className="mb-2 text-foreground-muted">老年预问诊与综合评估</p>
+        <div className="mt-4 mb-6 border-l-4 border-primary pl-4">
+          <p className="mb-2 text-foreground-muted">老年综合评估 · 职工工作台</p>
           <h1 className="text-3xl font-semibold">医院职工登录</h1>
         </div>
 
-        <Card>
+        <Card className="rounded-xl border-border shadow-none">
           <CardHeader>
-            <CardTitle>工号登录</CardTitle>
+            <CardTitle>使用职工账号</CardTitle>
             <CardDescription>请使用您的工号和密码登录</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4">
               <Input
                 label="工号"
+                className="cga-field"
                 type="text"
                 autoComplete="username"
                 placeholder="请输入工号"
@@ -64,6 +66,7 @@ export default function NurseLoginPage() {
               />
               <Input
                 label="密码"
+                className="cga-field"
                 type="password"
                 autoComplete="current-password"
                 placeholder="请输入密码"
@@ -72,11 +75,11 @@ export default function NurseLoginPage() {
                 required
               />
               {error && (
-                <p className="text-sm text-danger" role="alert">
+                <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-800" role="alert">
                   {error}
                 </p>
               )}
-              <Button type="submit" className="min-h-12 w-full rounded-lg bg-primary-hover hover:translate-y-0" loading={loading}>
+              <Button type="submit" className="min-h-13 w-full rounded-lg shadow-none hover:translate-y-0 hover:shadow-none" loading={loading}>
                 {loading ? '正在登录' : '登录'}
               </Button>
             </form>
@@ -100,6 +103,7 @@ export default function NurseLoginPage() {
           </CardContent>
         </Card>
 
+      </div>
     </main>
   );
 }

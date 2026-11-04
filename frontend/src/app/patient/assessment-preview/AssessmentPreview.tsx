@@ -30,20 +30,23 @@ export function AssessmentPreview() {
   }
 
   return (
-    <main className={`mx-auto w-full max-w-2xl px-5 py-8 sm:px-8 sm:py-12 ${largeText ? 'text-xl' : 'text-lg'}`}>
+    <main className="cga-screen min-h-dvh">
+      <div className={`mx-auto w-full max-w-2xl px-5 py-6 sm:px-8 sm:py-10 ${largeText ? 'text-xl' : 'text-lg'}`}>
       <header className="mb-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
           <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">返回首页</Link>
           <Button type="button" variant="outline" className="min-h-11 rounded-lg" aria-pressed={largeText} onClick={() => setLargeText(!largeText)}>大字模式</Button>
         </div>
+        <p className="mb-1 font-medium text-primary-hover">患者服务 · 演示</p>
         <h1 className="text-3xl font-semibold">预问诊评估样板</h1>
-        <p className="mt-3 border-l-4 border-primary bg-surface px-4 py-3 text-foreground-muted">
-          请使用示例答案。此样板仅预览 B.1 与 B.2 各一题，作答不会上传或用于临床判断。
+        <p className="mt-3 text-foreground-muted">
+          B.1 与 B.2 各有一道示例题。作答只在本页显示，不会上传。
         </p>
       </header>
 
       <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
-        <h2 ref={stepHeading} tabIndex={-1} className="mb-4 text-xl font-semibold focus:outline-none" aria-live="polite">
+        {item && <progress aria-label="填写进度" value={step + 1} max={sampleItems.length} className="mb-4 block h-2 w-full accent-primary" />}
+        <h2 ref={stepHeading} tabIndex={-1} className="mb-4 text-[1.1em] font-semibold text-primary-hover" aria-live="polite">
           {item ? `第 ${step + 1} / ${sampleItems.length} 题 · ${item.tool}` : '报告草稿预览'}
         </h2>
         {item ? (
@@ -52,7 +55,7 @@ export function AssessmentPreview() {
               <legend className="mb-4 text-[1.25em] leading-snug font-semibold">{item.question}</legend>
               <div className="space-y-3">
                 {item.options.map((option) => (
-                  <label key={option} className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 has-checked:border-primary has-checked:bg-primary-tint">
+                  <label key={option} className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border px-4 py-3 has-checked:border-primary has-checked:bg-primary-tint has-focus-visible:outline-2 has-focus-visible:outline-primary">
                     <input
                       type="radio"
                       name={`sample-${step}`}
@@ -86,6 +89,7 @@ export function AssessmentPreview() {
           </>
         )}
       </section>
+      </div>
     </main>
   );
 }
