@@ -20,6 +20,9 @@ from app.errors.handlers import AppError
 from app.models.patient_task import CareTask, Patient, PatientEncounter
 from app.schemas.patient import (
     InHospitalPatientDto,
+    OUTPATIENT_ACTIVE,
+    OUTPATIENT_CLOSED,
+    OutpatientEncounterRequest,
     PatientCreateRequest,
     PatientDto,
     PatientEncounterDto,
@@ -333,6 +336,7 @@ def update_patient_record(
         select(PatientEncounter).where(
             PatientEncounter.id == request.encounter.id,
             PatientEncounter.patient_id == patient_id,
+            PatientEncounter.encounter_status.not_in((OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED)),
             PatientEncounter.deleted == 0,
         )
     )
@@ -396,24 +400,72 @@ def update_patient_record(
     return _record_dto(db, patient, encounter)
 
 
-def _active_encounter(db: Session, patient_id: int) -> PatientEncounter | None:
-    """查询患者当前在院记录。"""
+def _active_encounter(
+    db: Session, patient_id: int, status: str = "在院"
+) -> PatientEncounter | None:
+    """按状态查询患者当前就诊。"""
     return db.scalar(
         select(PatientEncounter)
         .where(
             PatientEncounter.patient_id == patient_id,
-            PatientEncounter.encounter_status == "在院",
+            PatientEncounter.encounter_status == status,
             PatientEncounter.deleted == 0,
         )
         .order_by(PatientEncounter.admission_time.desc(), PatientEncounter.id.desc())
+        .limit(1)
     )
+
+
+def register_outpatient(
+    db: Session, patient_id: int, request: OutpatientEncounterRequest, *, operator: str
+) -> PatientRecordDto:
+    """对患者主档加锁，避免并发登记两个进行中的门诊评估。"""
+    patient = db.scalar(
+        select(Patient).where(Patient.id == patient_id, Patient.deleted == 0).with_for_update()
+    )
+    if patient is None:
+        raise AppError(ErrorCode.ERR_PATIENT_005)
+    if _active_encounter(db, patient.id, OUTPATIENT_ACTIVE) is not None:
+        raise AppError(ErrorCode.ERR_PATIENT_006, "患者已有进行中的门诊评估")
+    encounter = PatientEncounter(
+        encounter_no=_new_business_no(db, PatientEncounter),
+        patient_id=patient.id,
+        department_name=request.department_name.strip(),
+        admission_time=datetime.now(UTC),
+        encounter_status=OUTPATIENT_ACTIVE,
+        creator=operator,
+        updator=operator,
+    )
+    db.add(encounter)
+    db.flush()
+    result = _record_dto(db, patient, encounter)
+    db.commit()
+    return result
+
+
+def close_outpatient(db: Session, encounter_id: int, *, operator: str) -> None:
+    """结束门诊评估，重复结束请求不会修改首次结束时间。"""
+    encounter = db.scalar(
+        select(PatientEncounter).where(
+            PatientEncounter.id == encounter_id,
+            PatientEncounter.deleted == 0,
+            PatientEncounter.encounter_status.in_((OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED)),
+        ).with_for_update()
+    )
+    if encounter is None:
+        raise AppError(ErrorCode.ERR_PATIENT_005)
+    if encounter.encounter_status == OUTPATIENT_ACTIVE:
+        encounter.encounter_status = OUTPATIENT_CLOSED
+        encounter.discharge_time = datetime.now(UTC)
+        encounter.updator = operator
+    db.commit()
 
 
 def login_patient(
     db: Session,
     request: PatientLoginRequest,
 ) -> tuple[PatientLoginResponse, str]:
-    """核验住院患者身份并创建患者端登录会话。"""
+    """核验患者身份并创建绑定当前就诊的登录会话。"""
     phone = normalize_phone(request.phone)
     candidates = db.scalars(
         select(Patient).where(
@@ -436,27 +488,24 @@ def login_patient(
     if patient is None:
         raise AppError(ErrorCode.ERR_PATIENT_001)
 
-    encounter = _active_encounter(db, patient.id)
+    encounter = None
+    if request.encounter_kind != "outpatient":
+        encounter = _active_encounter(db, patient.id)
+    if encounter is None and request.encounter_kind != "inpatient":
+        encounter = _active_encounter(db, patient.id, OUTPATIENT_ACTIVE)
     if encounter is None:
-        raise AppError(ErrorCode.ERR_PATIENT_002)
+        raise AppError(ErrorCode.ERR_PATIENT_002, "没有可进入的就诊评估，请联系工作人员")
 
-    token = create_patient_session(
-        patient_id=patient.id,
-        encounter_id=encounter.id,
-    )
-
-    return (
-        PatientLoginResponse(
-            patient=_patient_dto(patient),
-            encounter=_encounter_dto(encounter),
-            tasks=task_service.list_patient_tasks(
-                db,
-                patient_id=patient.id,
-                encounter_id=encounter.id,
-            ),
+    portal = PatientLoginResponse(
+        patient=_patient_dto(patient),
+        encounter=_encounter_dto(encounter),
+        tasks=task_service.list_patient_tasks(
+            db,
+            patient_id=patient.id,
+            encounter_id=encounter.id,
         ),
-        token,
     )
+    return portal, create_patient_session(patient_id=patient.id, encounter_id=encounter.id)
 
 
 def create_patient_session(*, patient_id: int, encounter_id: int) -> str:
@@ -480,7 +529,7 @@ def get_patient_context(
     db: Session,
     request: Request,
 ) -> tuple[Patient, PatientEncounter]:
-    """读取当前患者登录会话并校验住院状态。"""
+    """读取患者登录会话并校验绑定就诊仍可访问。"""
     cookie_name = get_app_config().security.patient_session_cookie
     token = request.cookies.get(cookie_name)
     if not token:
@@ -500,7 +549,7 @@ def get_patient_context(
         select(PatientEncounter).where(
             PatientEncounter.id == payload.get("encounter_id"),
             PatientEncounter.patient_id == payload.get("patient_id"),
-            PatientEncounter.encounter_status == "在院",
+            PatientEncounter.encounter_status.in_(("在院", OUTPATIENT_ACTIVE)),
             PatientEncounter.deleted == 0,
         )
     )

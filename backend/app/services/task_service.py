@@ -26,6 +26,7 @@ from app.models.assessment_template import (
 from app.models.interaction import InteractionSession
 from app.models.patient_task import CareTask, Patient, PatientEncounter
 from app.models.staff_account import StaffAccount
+from app.schemas.patient import OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED
 from app.schemas.task import (
     BackendTaskDto,
     CreateTaskRequest,
@@ -220,6 +221,14 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
     )
     if encounter is None or encounter.patient_id != patient.id:
         raise AppError(ErrorCode.ERR_TASK_002)
+    if encounter.encounter_status == OUTPATIENT_CLOSED:
+        raise AppError(ErrorCode.ERR_TASK_002, "该门诊评估已结束")
+    if encounter.encounter_status == OUTPATIENT_ACTIVE and (
+        req.collection_mode != "traditional_form" or req.participant_type != "patient"
+    ):
+        raise AppError(
+            ErrorCode.ERR_TASK_002, "当前门诊评估仅开放患者本人填写传统问卷"
+        )
     if req.assigned_nurse_id is not None:
         assigned_staff = db.scalar(
             select(StaffAccount.id).where(

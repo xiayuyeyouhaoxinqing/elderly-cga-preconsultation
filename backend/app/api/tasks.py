@@ -10,9 +10,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import (
+    require_assessment_patient,
     require_patient,
     require_staff,
-    require_staff_or_patient,
+    require_staff_or_assessment_patient,
 )
 from app.models.base import get_db
 from app.models.patient_task import Patient, PatientEncounter
@@ -102,7 +103,7 @@ def get_questionnaire(
     db: DbSession,
     access: Annotated[
         StaffAccount | tuple[Patient, PatientEncounter],
-        Depends(require_staff_or_patient),
+        Depends(require_staff_or_assessment_patient),
     ],
 ) -> dict:
     """查询当前任务绑定的传统问卷及患者最新提交。"""
@@ -136,7 +137,7 @@ def save_questionnaire_draft(
     db: DbSession,
     patient_context: Annotated[
         tuple[Patient, PatientEncounter],
-        Depends(require_patient),
+        Depends(require_assessment_patient),
     ],
 ) -> dict:
     """保存患者传统问卷草稿，支持刷新和断点续答。"""
@@ -163,7 +164,7 @@ def submit_questionnaire(
     db: DbSession,
     patient_context: Annotated[
         tuple[Patient, PatientEncounter],
-        Depends(require_patient),
+        Depends(require_assessment_patient),
     ],
 ) -> dict:
     """校验所有必填题并正式提交患者传统问卷。"""

@@ -51,6 +51,7 @@ function PatientVerifyContent() {
   const [taskNo, setTaskNo] = useState(() => searchParams.get('taskNo') ?? '');
   const [idCardNo, setIdCardNo] = useState('');
   const [phone, setPhone] = useState('');
+  const [encounterKind, setEncounterKind] = useState<'inpatient' | 'outpatient'>('outpatient');
   const [participantType, setParticipantType] = useState<'patient' | 'family'>('patient');
   const [relationship, setRelationship] = useState('女儿');
   const [loading, setLoading] = useState(false);
@@ -81,6 +82,7 @@ function PatientVerifyContent() {
         const portal = await careRepository.loginPatient({
           idCardNo: idCardNo.trim(),
           phone: phone.trim(),
+          encounterKind,
         });
         setTasks(portal.tasks);
         login({
@@ -172,6 +174,16 @@ function PatientVerifyContent() {
         </header>
         <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
           <form onSubmit={handleVerify} className="space-y-5">
+            {apiMode && (
+              <label className="block font-medium">
+                <span className="mb-2 block">就诊类型</span>
+                <select className="cga-field" value={encounterKind}
+                  onChange={(event) => setEncounterKind(event.target.value === 'inpatient' ? 'inpatient' : 'outpatient')}>
+                  <option value="outpatient">门诊评估</option>
+                  <option value="inpatient">住院评估</option>
+                </select>
+              </label>
+            )}
             {!apiMode && (
               <fieldset>
                 <legend className="mb-2 font-semibold">由谁填写</legend>

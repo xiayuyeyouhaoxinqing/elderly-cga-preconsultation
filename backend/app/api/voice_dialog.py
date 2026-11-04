@@ -78,11 +78,11 @@ async def dialog_voice_socket(websocket: WebSocket, session_no: str) -> None:
     await websocket.accept()
     session = None
     try:
-        patient_id, _ = _authenticate_patient_websocket(websocket)
-        task_id, session_patient_id, _encounter_id, patient_info, scale_codes = _load_session(
+        patient_id, encounter_id = _authenticate_patient_websocket(websocket)
+        task_id, session_patient_id, session_encounter_id, patient_info, scale_codes = _load_session(
             session_no
         )
-        if patient_id != session_patient_id:
+        if (patient_id, encounter_id) != (session_patient_id, session_encounter_id):
             raise AppError(ErrorCode.ERR_DIALOG_004, "当前患者无权访问该语音会话")
         session = await voice_gateway.get_or_create(
             session_no=session_no,

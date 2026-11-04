@@ -171,7 +171,7 @@ export default function PatientTasksPage() {
             <PatientIcon name="document" className="h-7 w-7" />
           </span>
           <p className="text-lg font-black">
-            本次住院
+            本次就诊
             <span className="mx-2 text-[32px] text-primary">
               {taskGroups.unfinished.length}
             </span>

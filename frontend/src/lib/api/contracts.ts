@@ -66,6 +66,7 @@ export type InHospitalPatientDto = PatientRecordDto;
 export interface PatientLoginRequest {
   id_card_no: string;
   phone: string;
+  encounter_kind?: 'inpatient' | 'outpatient';
 }
 
 export interface PatientLoginResponse {
