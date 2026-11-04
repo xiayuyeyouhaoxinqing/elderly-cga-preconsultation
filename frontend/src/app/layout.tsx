@@ -4,8 +4,8 @@ import { NetworkStatus } from '@/components/shared/NetworkStatus';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '智能护理评估原型',
-  description: '住院患者入院评估、宣教、知情同意与护士复核交互原型',
+  title: '老年预问诊与综合评估',
+  description: '患者评估与医院职工工作入口',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

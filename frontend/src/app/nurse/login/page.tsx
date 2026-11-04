@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/shared/Button';
 import { Input } from '@/components/shared/Input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/shared/Card';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import { careRepository } from '@/lib/repositories';
-import { FaceSmileIcon } from '@heroicons/react/24/outline';
+import { runtimeConfig } from '@/lib/runtime/config';
 
 export default function NurseLoginPage() {
   const router = useRouter();
@@ -36,23 +37,18 @@ export default function NurseLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Logo 和标题 */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-2xl mb-4">
-            <span className="text-3xl text-white font-bold">医</span>
-          </div>
-          <h1 className="text-3xl font-serif font-medium text-foreground mb-2">
-            智能护理评估<span className="text-primary italic">系统</span>
-          </h1>
-          <p className="text-foreground-muted">医护端登录</p>
+    <main className="mx-auto w-full max-w-md px-5 py-10 sm:py-16">
+        <Link href="/" className="inline-flex min-h-11 items-center text-primary-hover underline underline-offset-4">
+          返回身份选择
+        </Link>
+        <div className="mt-6 mb-6">
+          <p className="mb-2 text-foreground-muted">老年预问诊与综合评估</p>
+          <h1 className="text-3xl font-semibold">医院职工登录</h1>
         </div>
 
-        {/* 登录表单 */}
         <Card>
           <CardHeader>
-            <CardTitle>欢迎回来</CardTitle>
+            <CardTitle>工号登录</CardTitle>
             <CardDescription>请使用您的工号和密码登录</CardDescription>
           </CardHeader>
           <CardContent>
@@ -80,17 +76,17 @@ export default function NurseLoginPage() {
                   {error}
                 </p>
               )}
-              <Button type="submit" className="w-full" loading={loading}>
-                登录
+              <Button type="submit" className="min-h-12 w-full rounded-lg bg-primary-hover hover:translate-y-0" loading={loading}>
+                {loading ? '正在登录' : '登录'}
               </Button>
             </form>
 
-            {/* 快速登录提示 */}
-            <div className="mt-5 grid grid-cols-2 gap-2">
+            {runtimeConfig.dataMode === 'mock' && (
+            <div className="mt-5 border-t border-border pt-4">
               <Button
                 type="button"
                 variant="outline"
-                size="sm"
+                className="min-h-11 rounded-lg"
                 onClick={() => {
                   setUsername('N001');
                   setPassword('123456');
@@ -98,29 +94,12 @@ export default function NurseLoginPage() {
               >
                 填充演示账号
               </Button>
-              <Button type="button" variant="outline" size="sm" disabled>
-                <FaceSmileIcon className="w-4 h-4 mr-1" />
-                人脸识别占位
-              </Button>
+              <p className="mt-2 text-sm text-foreground-muted">演示环境仅使用示例账号。</p>
             </div>
-            <div className="mt-4 p-3 bg-primary-tint rounded-xl">
-              <p className="text-xs text-foreground-muted text-center">
-                演示账号 N001～N005，密码均为 123456；API 模式由后端校验
-              </p>
-            </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* 患者端入口 */}
-        <div className="mt-6 text-center">
-          <a
-            href="/patient"
-            className="text-sm text-foreground-muted hover:text-primary transition-colors"
-          >
-            前往患者端 →
-          </a>
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }
