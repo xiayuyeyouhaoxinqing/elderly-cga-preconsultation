@@ -5,7 +5,7 @@ import PatientLayout from '@/components/layout/PatientLayout';
 import { PatientIcon } from '@/components/patient/PatientIcon';
 import { PatientState } from '@/components/patient/PatientState';
 import { isPatientTaskReadOnly } from '@/lib/patient/taskGroups';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import { useVerifiedPatientTasks } from '@/lib/patient/useVerifiedPatientTasks';
 
 const contentIcons = ['document', 'user', 'warning', 'shield'] as const;
 const contentTones = [
@@ -18,9 +18,16 @@ const contentTones = [
 export default function PatientTaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const router = useRouter();
-  const task = useTaskStore((state) =>
-    state.tasks.find((item) => item.id === taskId)
-  );
+  const { tasks, loading, loadError } = useVerifiedPatientTasks();
+  const task = tasks.find((item) => item.id === taskId);
+
+  if (loading) {
+    return (
+      <PatientLayout title="任务详情" showBack>
+        <p role="status" className="p-5">正在核验并加载任务…</p>
+      </PatientLayout>
+    );
+  }
 
   if (!task) {
     return (
@@ -28,8 +35,8 @@ export default function PatientTaskDetailPage() {
         <div className="p-[18px]">
           <PatientState
             kind="empty-tasks"
-            title="任务不存在或已经失效"
-            description="请返回任务中心查看最新护理任务。"
+            title={loadError ? '任务加载失败' : '任务不存在或已经失效'}
+            description={loadError || '请返回任务中心查看最新护理任务。'}
           />
           <button
             className="patient-primary-button mt-4 w-full"

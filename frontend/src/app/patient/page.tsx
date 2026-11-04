@@ -173,6 +173,11 @@ function PatientVerifyContent() {
           </p>
         </header>
         <section className="rounded-xl border border-border bg-surface p-5 sm:p-6">
+          {searchParams.get('session') === 'expired' && (
+            <p role="status" className="mb-4 rounded-lg bg-surface-secondary px-4 py-3 text-foreground">
+              患者登录已失效，请重新登录。
+            </p>
+          )}
           <form onSubmit={handleVerify} className="space-y-5">
             {apiMode && (
               <label className="block font-medium">

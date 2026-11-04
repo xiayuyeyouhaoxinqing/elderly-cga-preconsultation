@@ -1,16 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import PatientLayout from '@/components/layout/PatientLayout';
 import { PatientIcon } from '@/components/patient/PatientIcon';
 import { PatientState } from '@/components/patient/PatientState';
-import { abortRequest, isRequestCancelled } from '@/lib/api/httpClient';
 import { groupPatientTasks } from '@/lib/patient/taskGroups';
-import { careRepository } from '@/lib/repositories';
-import { runtimeConfig } from '@/lib/runtime/config';
-import { useTaskStore } from '@/lib/stores/useTaskStore';
+import { useVerifiedPatientTasks } from '@/lib/patient/useVerifiedPatientTasks';
 import { useUserStore } from '@/lib/stores/useUserStore';
 import type { CareTask } from '@/lib/types';
 
@@ -23,46 +18,10 @@ const statusLabels: Record<CareTask['taskStatus'], string> = {
 };
 
 export default function PatientTasksPage() {
-  const router = useRouter();
   const user = useUserStore((state) => state.user);
-  const hasHydrated = useUserStore((state) => state.hasHydrated);
-  const allTasks = useTaskStore((state) => state.tasks);
-  const setTasks = useTaskStore((state) => state.setTasks);
-  const [loadError, setLoadError] = useState('');
+  const { tasks: allTasks, loadError, loading } = useVerifiedPatientTasks();
   const tasks = allTasks.filter((task) => task.patientId === user?.id);
   const taskGroups = groupPatientTasks(tasks);
-
-  useEffect(() => {
-    if (runtimeConfig.dataMode !== 'api' || !hasHydrated) return;
-    if (!user) {
-      router.replace('/patient');
-      return;
-    }
-
-    const controller = new AbortController();
-    // API 模式先清理旧浏览器快照，避免后台准备中的任务在请求完成前短暂可见。
-    setTasks([]);
-    const loadTasks = async () => {
-      try {
-        const nextTasks = await careRepository.listPatientTasks(
-          controller.signal
-        );
-        setTasks(nextTasks);
-        setLoadError('');
-      } catch (error) {
-        if (controller.signal.aborted || isRequestCancelled(error)) return;
-        setLoadError(error instanceof Error ? error.message : '任务加载失败');
-      }
-    };
-    void loadTasks();
-    const timer = window.setInterval(() => {
-      void loadTasks();
-    }, 3000);
-    return () => {
-      window.clearInterval(timer);
-      abortRequest(controller);
-    };
-  }, [hasHydrated, router, setTasks, user]);
 
   const renderActiveTask = (task: CareTask) => {
     const current = task.progress?.current ?? 0;
@@ -188,7 +147,9 @@ export default function PatientTasksPage() {
           </div>
         )}
 
-        {tasks.length === 0 ? (
+        {loading ? (
+          <p role="status" className="mt-5 text-foreground-muted">正在核验并加载任务…</p>
+        ) : tasks.length === 0 ? (
           <PatientState
             kind={loadError ? 'voice-error' : 'empty-tasks'}
             title={loadError ? '护理任务加载失败' : '当前没有护理任务'}
