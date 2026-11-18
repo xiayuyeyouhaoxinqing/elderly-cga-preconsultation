@@ -145,7 +145,10 @@ export function mapTaskDto(dto: BackendTaskDto): CareTask {
     encounterStatus: dto.encounter_status,
     taskType:
       dto.task_type === 'assessment'
-        ? '入院评估任务包'
+        ? dto.assessment_scene === 'outpatient' ||
+          dto.encounter_status === '门诊评估中' || dto.encounter_status === '门诊评估结束'
+          ? '门诊评估任务'
+          : '入院评估任务包'
         : dto.task_type ?? '入院评估任务包',
     collectionMode: toCollectionMode(dto.collection_mode),
     taskStatus: dto.task_status,
@@ -374,6 +377,15 @@ function calculateAge(birthday?: string): number {
   return Math.max(age, 0);
 }
 
+const encounterStatuses: Record<string, PatientEncounter['encounterStatus']> = {
+  待入院: 'pending_admission',
+  在院: 'in_hospital',
+  取消: 'cancelled',
+  已出院: 'discharged',
+  门诊评估中: 'outpatient_active',
+  门诊评估结束: 'outpatient_closed',
+};
+
 export function mapInHospitalPatient(dto: InHospitalPatientDto): {
   patient: Patient;
   encounter: PatientEncounter;
@@ -419,7 +431,9 @@ export function mapInHospitalPatient(dto: InHospitalPatientDto): {
       id: id(dto.encounter.id),
       patientId,
       encounterNo: dto.encounter.encounter_no,
-      inpatientNo: dto.encounter.inpatient_no ?? dto.encounter.encounter_no,
+      inpatientNo: dto.encounter.inpatient_no ?? (
+        dto.encounter.encounter_status.startsWith('门诊') ? '' : dto.encounter.encounter_no
+      ),
       departmentCode: dto.encounter.department_code,
       department: dto.encounter.department_name ?? '',
       ward: dto.encounter.ward_name ?? '',
@@ -428,14 +442,7 @@ export function mapInHospitalPatient(dto: InHospitalPatientDto): {
       dischargeDate: dto.encounter.discharge_time,
       diagnosis: diagnosisText,
       diagnosisSnapshot: diagnosis,
-      encounterStatus:
-        dto.encounter.encounter_status === '待入院'
-          ? 'pending_admission'
-          : dto.encounter.encounter_status === '在院'
-            ? 'in_hospital'
-            : dto.encounter.encounter_status === '取消'
-              ? 'cancelled'
-              : 'discharged',
+      encounterStatus: encounterStatuses[dto.encounter.encounter_status] ?? 'discharged',
       admissionSource: dto.encounter.admission_source,
       nursingLevel: dto.encounter.nursing_level,
       insuranceType: dto.encounter.insurance_type,

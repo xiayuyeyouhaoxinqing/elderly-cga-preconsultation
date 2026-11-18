@@ -28,7 +28,7 @@ class CreateTaskRequest(BaseModel):
         default="patient",
         description="参与者类型",
     )
-    assessment_scene: Literal["admission", "reassessment", "transfer", "discharge"] = Field(
+    assessment_scene: Literal["admission", "reassessment", "transfer", "discharge", "outpatient"] = Field(
         default="admission", description="评估场景"
     )
     assigned_nurse_id: int | None = Field(default=None, description="负责护士ID")

@@ -30,6 +30,8 @@ function encounterStatusLabel(
 ) {
   if (status === 'pending_admission') return '待入院';
   if (status === 'in_hospital') return '在院';
+  if (status === 'outpatient_active') return '门诊评估中';
+  if (status === 'outpatient_closed') return '门诊评估结束';
   if (status === 'cancelled') return '取消';
   return '已出院';
 }
@@ -37,7 +39,7 @@ function encounterStatusLabel(
 function encounterStatusVariant(
   status: PatientWithEncounter['encounter']['encounterStatus']
 ) {
-  if (status === 'in_hospital') return 'success' as const;
+  if (status === 'in_hospital' || status === 'outpatient_active') return 'success' as const;
   if (status === 'pending_admission') return 'warning' as const;
   return 'default' as const;
 }
@@ -135,18 +137,20 @@ export default function NursePatientsPage() {
             placeholder="姓名 / 患者号 / HIS ID / 住院号 / 床号"
           />
           <select
-            aria-label="住院状态"
+            aria-label="就诊状态"
             value={status}
             onChange={(event) =>
               setStatus(event.target.value as typeof status)
             }
             className={selectClassName}
           >
-            <option value="">全部住院状态</option>
+            <option value="">全部就诊状态</option>
             <option value="待入院">待入院</option>
             <option value="在院">在院</option>
             <option value="已出院">已出院</option>
             <option value="取消">取消</option>
+            <option value="门诊评估中">门诊评估中</option>
+            <option value="门诊评估结束">门诊评估结束</option>
           </select>
           <select
             aria-label="科室"
@@ -199,7 +203,7 @@ export default function NursePatientsPage() {
       ) : (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {records.map(({ patient, encounter, taskSummary }) => (
-            <Link key={patient.id} href={`/nurse/patients/${patient.id}`}>
+            <Link key={encounter.id} href={`/nurse/patients/${patient.id}`}>
               <Card hover padding="lg" className="h-full">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-tint font-semibold text-primary">
@@ -247,9 +251,9 @@ export default function NursePatientsPage() {
 
                     <div className="mt-4 grid grid-cols-2 gap-3 text-sm lg:grid-cols-4">
                       <div className="rounded-xl bg-surface-secondary p-3">
-                        <p className="text-xs text-foreground-muted">住院号</p>
+                        <p className="text-xs text-foreground-muted">{encounter.inpatientNo ? '住院号' : '就诊编号'}</p>
                         <p className="mt-1 truncate font-medium">
-                          {encounter.inpatientNo}
+                          {encounter.inpatientNo || encounter.encounterNo}
                         </p>
                       </div>
                       <div className="rounded-xl bg-surface-secondary p-3">

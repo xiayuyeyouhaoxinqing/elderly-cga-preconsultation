@@ -52,6 +52,8 @@ export interface PatientEncounter {
   encounterStatus:
     | 'pending_admission'
     | 'in_hospital'
+    | 'outpatient_active'
+    | 'outpatient_closed'
     | 'discharged'
     | 'cancelled';
   admissionSource?: string;
@@ -71,7 +73,7 @@ export type TaskStatus =
 // 采集模式
 export type CollectionMode = 'traditional_form' | 'ai_dialogue';
 export type ParticipantType = 'patient' | 'family' | 'agent';
-export type AssessmentScene = 'admission' | 'reassessment' | 'transfer' | 'discharge';
+export type AssessmentScene = 'admission' | 'reassessment' | 'transfer' | 'discharge' | 'outpatient';
 export type PrototypeAnswerValue = string | string[] | number | boolean | null;
 
 export interface TaskScaleProgress {

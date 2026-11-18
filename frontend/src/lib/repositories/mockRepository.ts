@@ -311,12 +311,12 @@ function buildMockTask(input: CreateTaskInput): CareTask {
     sessionId: `SESSION-${id}`,
     patientId: input.patient.id,
     encounterId: input.encounter.id,
-    encounterNo: input.encounter.inpatientNo,
+    encounterNo: input.encounter.encounterNo,
     patientName: input.patient.name,
     bedNo: input.encounter.bedNo,
     department: input.encounter.department,
     wardName: input.encounter.ward,
-    taskType: '入院评估任务包',
+    taskType: input.assessmentScene === 'outpatient' ? '门诊评估任务' : '入院评估任务包',
     collectionMode: input.collectionMode,
     taskStatus: 'pending',
     assignedNurseId: input.nurseId,
@@ -458,12 +458,13 @@ export class MockCareRepository implements CareRepository {
       在院: 'in_hospital',
       已出院: 'discharged',
       取消: 'cancelled',
+      门诊评估中: 'outpatient_active',
+      门诊评估结束: 'outpatient_closed',
     };
-    return mockPatients.flatMap((patient) => {
-      const encounter = mockEncounters.find(
-        (item) => item.patientId === patient.id
-      );
-      if (!encounter) return [];
+    return mockEncounters.flatMap((encounter) => {
+      if (filters.patientId && encounter.patientId !== filters.patientId) return [];
+      const patient = mockPatients.find((item) => item.id === encounter.patientId);
+      if (!patient) return [];
       const searchable = [
         patient.name,
         patient.patientNo,
@@ -498,6 +499,38 @@ export class MockCareRepository implements CareRepository {
     signal?: AbortSignal
   ): Promise<PatientWithEncounter[]> {
     return this.listPatients({ status: '在院' }, signal);
+  }
+
+  async registerOutpatient(patientId: string, departmentName: string) {
+    await wait();
+    const patient = mockPatients.find((item) => item.id === patientId);
+    if (!patient) throw new Error('患者不存在');
+    if (mockEncounters.some((item) => item.patientId === patientId && item.encounterStatus === 'outpatient_active')) {
+      throw new Error('已有进行中的门诊评估');
+    }
+    const encounter: PatientWithEncounter['encounter'] = {
+      id: `OP-${crypto.randomUUID()}`,
+      encounterNo: `OP-${Date.now()}`,
+      patientId,
+      inpatientNo: '',
+      department: departmentName,
+      ward: '',
+      bedNo: '',
+      admissionDate: new Date().toISOString(),
+      diagnosis: '',
+      encounterStatus: 'outpatient_active',
+    };
+    mockEncounters.push(encounter);
+    return buildMockPatientRecord(patient, encounter);
+  }
+
+  async closeOutpatient(encounterId: string) {
+    await wait();
+    const encounter = mockEncounters.find((item) => item.id === encounterId);
+    if (encounter?.encounterStatus === 'outpatient_closed') return;
+    if (encounter?.encounterStatus !== 'outpatient_active') throw new Error('门诊评估不存在');
+    encounter.encounterStatus = 'outpatient_closed';
+    encounter.dischargeDate = new Date().toISOString();
   }
 
   async getPatient(
@@ -863,6 +896,9 @@ export class MockCareRepository implements CareRepository {
 
   async createTask(input: CreateTaskInput, signal?: AbortSignal) {
     await wait(signal);
+    if (mockEncounters.some((item) => item.id === input.encounter.id && item.encounterStatus === 'outpatient_closed')) {
+      throw new Error('该门诊评估已结束');
+    }
     return buildMockTask(input);
   }
 

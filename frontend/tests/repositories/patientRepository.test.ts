@@ -181,6 +181,57 @@ describe('patient management repository', () => {
     });
   });
 
+  it('按患者查询门诊、登记和结束评估，保留就诊编号', async () => {
+    const dto = {
+      patient: { id: 9, patient_no: 'P0009', patient_name: '测试患者' },
+      encounter: {
+        id: 20,
+        patient_id: 9,
+        encounter_no: 'MZ0020',
+        inpatient_no: null,
+        encounter_status: '门诊评估中',
+        department_name: '老年医学科',
+      },
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(okResponse([dto]))
+      .mockResolvedValueOnce(okResponse(dto))
+      .mockResolvedValueOnce(okResponse(null));
+    vi.stubGlobal('fetch', fetchMock);
+    const repository = new ApiCareRepository();
+
+    const [listed] = await repository.listPatients({
+      patientId: '9',
+      status: '门诊评估中',
+    });
+    const registered = await repository.registerOutpatient('9', '老年医学科');
+    await repository.closeOutpatient('20');
+
+    expect(listed.encounter).toMatchObject({
+      id: '20',
+      encounterNo: 'MZ0020',
+      inpatientNo: '',
+      encounterStatus: 'outpatient_active',
+    });
+    expect(registered).toEqual(listed);
+    const listUrl = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(listUrl.searchParams.get('patient_id')).toBe('9');
+    expect(listUrl.searchParams.get('status')).toBe('门诊评估中');
+    const [registerUrl, registerRequest] = fetchMock.mock.calls[1];
+    expect(new URL(String(registerUrl)).pathname).toBe(
+      '/api/patients/9/outpatient-encounters'
+    );
+    expect(JSON.parse(String(registerRequest.body))).toEqual({
+      department_name: '老年医学科',
+    });
+    const [closeUrl, closeRequest] = fetchMock.mock.calls[2];
+    expect(new URL(String(closeUrl)).pathname).toBe(
+      '/api/patients/outpatient-encounters/20/close'
+    );
+    expect(closeRequest.method).toBe('POST');
+  });
+
   it('Mock 模式支持患者列表、新增、详情和编辑闭环', async () => {
     const repository = new MockCareRepository();
     const created = await repository.createPatient(patientInput);
