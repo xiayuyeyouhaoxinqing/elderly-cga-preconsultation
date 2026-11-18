@@ -19,7 +19,6 @@ if ($LASTEXITCODE -ne 0) { throw '安装前端依赖失败' }
 $env:NEXT_PUBLIC_DATA_MODE = 'mock'
 pnpm dev
 ```
-123
 
 打开终端显示的本机地址。首页可进入患者端、职工端或「体验评估样板」。职工端可用演示账号查看已发布量表。Mock 模式使用合成数据，可独立运行。
 
