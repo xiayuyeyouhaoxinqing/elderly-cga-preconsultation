@@ -71,7 +71,7 @@ This file provides guidance to AI coding agents (Claude Code, Codex, and others)
 - `app/models/education.py` — 宣教方案、版本与内容单元 3 表
 - `app/models/nursing_plan.py` — 患者画像快照、护理计划与计划明细 3 表
 - Alembic 初始迁移：`26533d4669bd_initial_domain_model_batch_a.py`
-- 当前迁移头：`20260820_patient_management_event_idempotency.py`
+- 当前迁移头：`20261118_questionnaire_return_reason.py`
 
 
 ## 项目架构

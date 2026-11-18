@@ -85,6 +85,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
   `PUT /api/tasks/{task_ref}/questionnaire/draft` 和
   `POST /api/tasks/{task_ref}/questionnaire/submit`。页面必须以服务端题目/提交状态为准，
   正式提交后只读，退回后允许继续填写，不能用 `prototypeQuestions` 补齐 API 数据。
+- API 模式传统问卷以服务端草稿为起点，按题目 ID 发送本页编辑。向患者只展示
+  `returnReason`，医护复核通过 `expectedSubmissionId` 校验本次提交版本。
 - 传统问卷患者进度只统计必填且非派生题；派生题只读展示。医护复核页展示患者答案真实标签、
   计分和风险解释，不渲染 AI 证据或虚构的人机差异。API 与 Mock Repository 保持同一问卷
   接口，后端返回的选项编码仅用于请求和审计，用户界面优先展示标签/值。

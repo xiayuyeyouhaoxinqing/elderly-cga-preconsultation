@@ -90,6 +90,8 @@ class QuestionnaireDto(BaseModel):
     questions: list[QuestionnaireQuestionDto] = Field(default_factory=list)
     answers: list[QuestionnaireAnswerDto] = Field(default_factory=list)
     scores: list[QuestionnaireScoreDto] = Field(default_factory=list)
+    submission_id: int | None = None
+    return_reason: str | None = None
     submitted_at: datetime | None = None
     updated_at: datetime | None = None
 

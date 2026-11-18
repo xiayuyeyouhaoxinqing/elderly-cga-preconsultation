@@ -8,7 +8,7 @@ import logging
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.errors.codes import ErrorCode
@@ -20,8 +20,9 @@ from app.models.assessment_execution import (
     AssessmentSubmission,
 )
 from app.models.assessment_template import AssessmentQuestion
-from app.models.patient_task import CareTask
+from app.models.patient_task import CareTask, PatientEncounter
 from app.schemas.assessment_review import AssessmentReviewRequest
+from app.schemas.patient import OUTPATIENT_CLOSED
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +33,46 @@ def _load_task(db: Session, task_ref: str, staff_id: int) -> CareTask:
     if task_ref.isdigit():
         conditions.append(CareTask.id == int(task_ref))
     task = db.scalar(
-        select(CareTask).where(or_(*conditions), CareTask.deleted == 0)
+        select(CareTask).where(or_(*conditions), CareTask.deleted == 0).with_for_update()
     )
     if task is None:
         raise AppError(ErrorCode.ERR_TASK_003)
     if task.assigned_nurse_id is not None and task.assigned_nurse_id != staff_id:
         raise AppError(ErrorCode.ERR_COMMON_001, "当前任务不属于登录医护人员", 403)
     return task
+
+
+def _validate_questionnaire_review(
+    db: Session, task: CareTask, request: AssessmentReviewRequest,
+) -> str | None:
+    if task.task_status != "pending_review":
+        raise AppError(ErrorCode.ERR_COMMON_003, "仅可复核当前待复核的问卷", 409)
+    if request.expected_submission_id is not None:
+        latest_id = db.scalar(
+            select(func.max(AssessmentSubmission.id))
+            .join(AssessmentInstance, AssessmentInstance.id == AssessmentSubmission.assessment_instance_id)
+            .where(
+                AssessmentInstance.task_id == task.id,
+                AssessmentInstance.deleted == 0,
+                AssessmentSubmission.submission_type == "patient_self",
+                AssessmentSubmission.deleted == 0,
+            )
+        )
+        if request.expected_submission_id != latest_id:
+            raise AppError(ErrorCode.ERR_COMMON_003, "患者已更新提交，请刷新后复核", 409)
+    if request.status != "returned":
+        return None
+    reason = (request.return_reason or "").strip()
+    if not reason:
+        raise AppError(ErrorCode.ERR_COMMON_001, "请填写给患者的退回原因")
+    encounter_status = db.scalar(
+        select(PatientEncounter.encounter_status)
+        .where(PatientEncounter.id == task.encounter_id)
+        .with_for_update()
+    )
+    if encounter_status == OUTPATIENT_CLOSED:
+        raise AppError(ErrorCode.ERR_COMMON_003, "门诊已结束，患者无法补录", 409)
+    return reason
 
 
 def _question_id_map(db: Session, instance: AssessmentInstance) -> dict[str, int]:
@@ -115,6 +149,13 @@ def submit_assessment_review(
 ) -> dict:
     """保存复核结果并在最终确认后触发护理计划重新生成。"""
     task = _load_task(db, task_ref, staff_id)
+    if request.task_id not in {str(task.id), task.task_no}:
+        raise AppError(ErrorCode.ERR_COMMON_001, "请求任务编号与路径不一致")
+    return_reason = (
+        _validate_questionnaire_review(db, task, request)
+        if task.collection_mode == "traditional_form"
+        else None
+    )
     instances = list(
         db.scalars(
             select(AssessmentInstance)
@@ -172,6 +213,7 @@ def submit_assessment_review(
                 reviewer_id=staff_id,
                 review_status=request.status,
                 supplementary_inquiry=request.supplementary_inquiry or None,
+                return_reason=return_reason,
                 correction_reason="\n".join(
                     f"{key}: {value}"
                     for key, value in request.correction_reasons.items()

@@ -213,7 +213,9 @@ describe('API mappers', () => {
       task_id: 21,
       task_no: 'TASK-Q-21',
       collection_mode: 'traditional_form',
-      status: 'in_progress',
+      status: 'returned',
+      submission_id: 34,
+      return_reason: '请补充最近一次情况',
       questions: [
         {
           id: 100,
@@ -255,7 +257,9 @@ describe('API mappers', () => {
       sectionName: '基本情况',
       required: true,
     });
-    expect(questionnaire.answerValues.fall_history).toBe(false);
+    expect(questionnaire.answerValues['100']).toBe(false);
+    expect(questionnaire.submissionId).toBe('34');
+    expect(questionnaire.returnReason).toBe('请补充最近一次情况');
     expect(questionnaire.answers[0].displayValue).toBe('否');
   });
 });

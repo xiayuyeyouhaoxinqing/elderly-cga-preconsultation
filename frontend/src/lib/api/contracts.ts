@@ -423,6 +423,8 @@ export interface QuestionnaireDto {
   questions: QuestionnaireQuestionDto[];
   answers: QuestionnaireAnswerDto[];
   scores: QuestionnaireScoreDto[];
+  submission_id?: ApiId | null;
+  return_reason?: string | null;
   submitted_at?: string | null;
   updated_at?: string | null;
 }

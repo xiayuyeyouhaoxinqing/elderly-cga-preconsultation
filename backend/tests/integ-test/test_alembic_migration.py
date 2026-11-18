@@ -12,7 +12,7 @@ from alembic import command
 DEFAULT_DATABASE_URL = (
     "postgresql://medical:medical_dev_password@localhost:15432/medical_evaluate"
 )
-EXPECTED_REVISION = "20260822_patient_portal"
+EXPECTED_REVISION = "20261118_questionnaire_return"
 EXPECTED_TABLE_COUNT = 49
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
@@ -71,6 +71,9 @@ def test_initial_migration_upgrade_and_downgrade():
                 "allergy_summary",
             } <= encounter_columns
             assert "source_invocation_id" in event_columns
+            assert "return_reason" in {
+                column["name"] for column in inspector.get_columns("assessment_review")
+            }
             with test_engine.connect() as connection:
                 revision = connection.scalar(text("SELECT version_num FROM alembic_version"))
             assert revision == EXPECTED_REVISION

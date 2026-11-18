@@ -1184,6 +1184,8 @@ export class ApiCareRepository implements CareRepository {
           final_answers: review.finalAnswers,
           correction_reasons: review.correctionReasons,
           supplementary_inquiry: review.supplementaryInquiry,
+          return_reason: review.returnReason,
+          expected_submission_id: review.expectedSubmissionId,
           status: review.status,
         },
         signal,

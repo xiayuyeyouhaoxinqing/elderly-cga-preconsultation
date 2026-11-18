@@ -291,7 +291,7 @@ export function mapQuestionnaireDto(dto: QuestionnaireDto): QuestionnaireSnapsho
     answers,
     answerValues: Object.fromEntries(
       dto.answers.map((answer) => [
-        answer.question_code,
+        id(answer.question_id),
         mapQuestionnaireValue(answer),
       ])
     ),
@@ -302,6 +302,8 @@ export function mapQuestionnaireDto(dto: QuestionnaireDto): QuestionnaireSnapsho
       riskLevel: score.risk_level ?? undefined,
       resultSummary: score.result_summary ?? undefined,
     })),
+    submissionId: dto.submission_id == null ? undefined : id(dto.submission_id),
+    returnReason: dto.return_reason ?? undefined,
     submittedAt: dto.submitted_at ?? undefined,
     updatedAt: dto.updated_at ?? undefined,
   };

@@ -301,6 +301,8 @@ export interface QuestionnaireSnapshot {
   answers: QuestionnaireAnswer[];
   answerValues: Record<string, PrototypeAnswerValue>;
   scores: QuestionnaireScore[];
+  submissionId?: string;
+  returnReason?: string;
   submittedAt?: string;
   updatedAt?: string;
 }
@@ -519,6 +521,8 @@ export interface AssessmentReview {
   finalAnswers: Record<string, string>;
   correctionReasons: Record<string, string>;
   supplementaryInquiry?: string;
+  returnReason?: string;
+  expectedSubmissionId?: string;
   status: 'draft' | 'returned' | 'confirmed';
   reviewedAt?: string;
 }

@@ -20,6 +20,7 @@ from app.models.assessment_execution import (
     AssessmentAnswer,
     AssessmentAnswerOption,
     AssessmentInstance,
+    AssessmentReview,
     AssessmentScore,
     AssessmentSubmission,
 )
@@ -31,7 +32,8 @@ from app.models.assessment_template import (
     AssessmentScaleVersion,
     AssessmentSection,
 )
-from app.models.patient_task import CareTask
+from app.models.patient_task import CareTask, PatientEncounter
+from app.schemas.patient import OUTPATIENT_ACTIVE
 from app.schemas.questionnaire import (
     QuestionnaireAnswerDto,
     QuestionnaireAnswersRequest,
@@ -47,14 +49,13 @@ _FINAL_SUBMISSION_STATUSES = {"submitted", "completed", "confirmed"}
 logger = logging.getLogger(__name__)
 
 
-def _resolve_task(db: Session, task_ref: str) -> CareTask:
+def _resolve_task(db: Session, task_ref: str, *, for_update: bool = False) -> CareTask:
     """按任务主键或业务编号加载任务。"""
     conditions = [CareTask.task_no == task_ref]
     if task_ref.isdigit():
         conditions.append(CareTask.id == int(task_ref))
-    task = db.scalar(
-        select(CareTask).where(or_(*conditions), CareTask.deleted == 0)
-    )
+    query = select(CareTask).where(or_(*conditions), CareTask.deleted == 0)
+    task = db.scalar(query.with_for_update() if for_update else query)
     if task is None:
         raise AppError(ErrorCode.ERR_TASK_003)
     return task
@@ -95,6 +96,17 @@ def _assert_request_task_id(task: CareTask, request_task_id: str) -> None:
     """防止请求体任务编号与路径任务不一致。"""
     if request_task_id not in {str(task.id), task.task_no}:
         raise AppError(ErrorCode.ERR_COMMON_001, "请求任务编号与路径不一致")
+
+
+def _lock_patient_encounter(db: Session, encounter_id: int) -> None:
+    """在写入事务内重新校验就诊，防止已结束门诊的在途保存。"""
+    status = db.scalar(
+        select(PatientEncounter.encounter_status)
+        .where(PatientEncounter.id == encounter_id, PatientEncounter.deleted == 0)
+        .with_for_update()
+    )
+    if status not in {"在院", OUTPATIENT_ACTIVE}:
+        raise AppError(ErrorCode.ERR_PATIENT_009, "本次就诊已结束，请重新核验", 401)
 
 
 def _load_instance_rows(
@@ -339,6 +351,8 @@ def _question_dto(
 def _status(
     task: CareTask,
     submissions: dict[int, AssessmentSubmission],
+    *,
+    returned: bool = False,
 ) -> str:
     """根据任务和患者提交状态生成问卷状态。"""
     if task.task_status == "completed":
@@ -346,7 +360,7 @@ def _status(
     if task.task_status == "pending_review":
         return "submitted"
     if task.task_status == "in_progress":
-        if any(
+        if returned or any(
             submission.submission_status in _FINAL_SUBMISSION_STATUSES
             for submission in submissions.values()
         ):
@@ -489,10 +503,25 @@ def _build_dto(db: Session, task: CareTask) -> QuestionnaireDto:
         for _, _, _, question, _ in question_rows
         if question.id in answers
     ]
+    latest_return = None
+    if task.task_status == "in_progress":
+        latest_return = db.scalar(
+            select(AssessmentReview)
+            .join(AssessmentInstance, AssessmentInstance.id == AssessmentReview.assessment_instance_id)
+            .where(
+                AssessmentInstance.task_id == task.id,
+                AssessmentInstance.deleted == 0,
+                AssessmentReview.review_status == "returned",
+                AssessmentReview.deleted == 0,
+            )
+            .order_by(AssessmentReview.id.desc())
+            .limit(1)
+        )
+    status = _status(task, submissions, returned=latest_return is not None)
     scores: list[QuestionnaireScoreDto] = []
     for instance, scale, version in instance_rows:
         submission = submissions.get(instance.id)
-        if submission is None or submission.total_score is None:
+        if status not in {"submitted", "confirmed"} or submission is None or submission.total_score is None:
             continue
         scores.append(
             QuestionnaireScoreDto(
@@ -508,10 +537,12 @@ def _build_dto(db: Session, task: CareTask) -> QuestionnaireDto:
         task_id=task.id,
         task_no=task.task_no,
         collection_mode="traditional_form",
-        status=_status(task, submissions),
+        status=status,
         questions=questions_dto,
         answers=answers_dto,
         scores=scores,
+        submission_id=latest_submission.id if latest_submission else None,
+        return_reason=latest_return.return_reason if latest_return else None,
         submitted_at=latest_submission.submitted_at if latest_submission else None,
         updated_at=latest_submission.update_time if latest_submission else task.update_time,
     )
@@ -738,8 +769,6 @@ def _submission_for_instance(
     )
     if latest is not None and latest.submission_status in _EMPTY_SUBMISSION_STATUSES:
         return latest
-    if latest is not None and task.task_status in {"pending_review", "completed"}:
-        return latest
     submission = AssessmentSubmission(
         submission_no=f"SUB-{uuid.uuid4().hex[:16].upper()}",
         assessment_instance_id=instance.id,
@@ -754,7 +783,44 @@ def _submission_for_instance(
     )
     db.add(submission)
     db.flush()
+    if latest is not None and latest.submission_status in _FINAL_SUBMISSION_STATUSES:
+        _copy_patient_answers(db, latest.id, submission.id, actor=actor)
     return submission
+
+
+def _copy_patient_answers(db: Session, source_id: int, target_id: int, *, actor: str) -> None:
+    """复制原提交的结构化答案，补录草稿各自拥有独立的答案和选项记录。"""
+    originals = _latest_answers(db, [source_id])
+    options = _answer_options(db, [answer.id for answer in originals.values()])
+    copied = {}
+    for original in originals.values():
+        answer = AssessmentAnswer(
+            submission_id=target_id, question_id=original.question_id,
+            answer_type=original.answer_type, answer_text=original.answer_text,
+            answer_number=original.answer_number, answer_boolean=original.answer_boolean,
+            answer_date=original.answer_date, answer_time=original.answer_time,
+            answer_datetime=original.answer_datetime, answer_unit=original.answer_unit,
+            clinical_score=original.clinical_score, value_source=original.value_source,
+            source_message_ids=original.source_message_ids,
+            extraction_confidence=original.extraction_confidence,
+            abnormal_flag=original.abnormal_flag, risk_tags=original.risk_tags,
+            creator=actor, updator=actor,
+        )
+        db.add(answer)
+        copied[original.id] = answer
+    db.flush()
+    for original_id, answer in copied.items():
+        for option in options.get(original_id, []):
+            db.add(AssessmentAnswerOption(
+                assessment_answer_id=answer.id, option_id=option.option_id,
+                option_code_snapshot=option.option_code_snapshot,
+                option_label_snapshot=option.option_label_snapshot,
+                clinical_score=option.clinical_score,
+                extra_text=option.extra_text, extra_number=option.extra_number,
+                extra_unit=option.extra_unit, selected_flag=option.selected_flag,
+                creator=actor, updator=actor,
+            ))
+    db.flush()
 
 
 def _save_answers(
@@ -809,6 +875,7 @@ def _save_answers(
             actor=actor,
         )
 
+    db.flush()
     missing: list[int] = []
     for instance, _, version in instance_rows:
         submission = submissions_by_instance[instance.id]
@@ -846,10 +913,11 @@ def save_draft(
     encounter_id: int,
 ) -> QuestionnaireDto:
     """保存患者问卷草稿。"""
-    task = _resolve_task(db, task_ref)
+    task = _resolve_task(db, task_ref, for_update=True)
     _assert_task_access(task, patient_id=patient_id, encounter_id=encounter_id)
     _assert_traditional_task(task)
     _assert_request_task_id(task, request.task_id)
+    _lock_patient_encounter(db, encounter_id)
     if task.task_status in {"pending_review", "completed"}:
         raise AppError(ErrorCode.ERR_COMMON_003, "问卷已提交，当前不可修改", http_status=409)
     try:
@@ -875,10 +943,11 @@ def submit_questionnaire(
     encounter_id: int,
 ) -> QuestionnaireDto:
     """校验并正式提交患者传统问卷。"""
-    task = _resolve_task(db, task_ref)
+    task = _resolve_task(db, task_ref, for_update=True)
     _assert_task_access(task, patient_id=patient_id, encounter_id=encounter_id)
     _assert_traditional_task(task)
     _assert_request_task_id(task, request.task_id)
+    _lock_patient_encounter(db, encounter_id)
     if task.task_status in {"pending_review", "completed"}:
         return _build_dto(db, task)
     try:

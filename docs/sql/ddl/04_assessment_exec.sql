@@ -282,6 +282,7 @@ CREATE TABLE assessment_review (
     reviewer_id            BIGINT       NOT NULL,
     review_status          VARCHAR(32)  NOT NULL DEFAULT 'pending',
     supplementary_inquiry  TEXT         NOT NULL DEFAULT '',
+    return_reason           TEXT,
     correction_reason      VARCHAR(1000) NOT NULL DEFAULT '',
     reviewed_at            TIMESTAMP(3),
     creator                VARCHAR(64)  NOT NULL DEFAULT '',

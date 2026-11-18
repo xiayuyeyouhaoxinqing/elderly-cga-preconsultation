@@ -39,32 +39,34 @@ export default function NurseReviewPage() {
   const aiAnswers = structuredAnswers[taskId];
   const session = useChatStore((state) => state.sessions[taskId]);
   const apiMode = runtimeConfig.dataMode === 'api';
+  const traditionalApi = apiMode && task?.collectionMode === 'traditional_form';
   const [questionnaire, setQuestionnaire] = useState<
     Awaited<ReturnType<typeof careRepository.getQuestionnaire>> | null
   >(null);
-  const [questionnaireLoading, setQuestionnaireLoading] = useState(
-    apiMode && task?.collectionMode === 'traditional_form'
-  );
+  const [questionnaireError, setQuestionnaireError] = useState('');
 
   useEffect(() => {
-    if (!apiMode || !task || task.collectionMode !== 'traditional_form') return;
+    if (!traditionalApi) return;
     const controller = new AbortController();
     void careRepository
       .getQuestionnaire(taskId, controller.signal)
-      .then(setQuestionnaire)
-      .catch(() => {
-        if (!controller.signal.aborted) setQuestionnaire(null);
+      .then((snapshot) => {
+        if (controller.signal.aborted) return;
+        setQuestionnaire(snapshot);
+        setQuestionnaireError('');
       })
-      .finally(() => {
-        if (!controller.signal.aborted) setQuestionnaireLoading(false);
+      .catch((failure) => {
+        if (controller.signal.aborted) return;
+        setQuestionnaire(null);
+        setQuestionnaireError(failure instanceof Error ? failure.message : '无法读取本次提交');
       });
     return () => controller.abort();
-  }, [apiMode, task, taskId]);
+  }, [traditionalApi, task?.taskStatus, taskId]);
 
   const sourceAnswers = useMemo(() => {
-    if (apiMode && task?.collectionMode === 'traditional_form' && questionnaire) {
+    if (traditionalApi) {
       return Object.fromEntries(
-        questionnaire.answers.map((answer) => [
+        (questionnaire?.answers ?? []).map((answer) => [
           answer.questionId,
           answer.displayValue ?? answer.selectedOptionLabels.join('、') ?? '',
         ])
@@ -81,39 +83,47 @@ export default function NurseReviewPage() {
     return Object.fromEntries(
       Object.entries(formSubmission ?? {}).map(([key, value]) => [key, answerText(value)])
     );
-  }, [aiAnswers, apiMode, formSubmission, questionnaire, task?.collectionMode]);
+  }, [aiAnswers, formSubmission, questionnaire, task?.collectionMode, traditionalApi]);
 
   const reviewQuestions = useMemo(() => {
-    if (apiMode && task?.collectionMode === 'traditional_form' && questionnaire) {
-      return questionnaire.questions.filter((question) =>
+    if (traditionalApi) {
+      return (questionnaire?.questions ?? []).filter((question) =>
         Object.prototype.hasOwnProperty.call(sourceAnswers, question.id)
       );
     }
     return prototypeQuestions.filter((question) =>
       Object.prototype.hasOwnProperty.call(sourceAnswers, question.id)
     );
-  }, [apiMode, questionnaire, sourceAnswers, task?.collectionMode]);
+  }, [questionnaire, sourceAnswers, traditionalApi]);
   const [nurseAnswers, setNurseAnswers] = useState<Record<string, string>>(
-    existingReview?.nurseAnswers ?? {}
+    traditionalApi ? {} : existingReview?.nurseAnswers ?? {}
   );
   const [reasons, setReasons] = useState<Record<string, string>>(
-    existingReview?.correctionReasons ?? {}
+    traditionalApi ? {} : existingReview?.correctionReasons ?? {}
   );
   const [supplementaryInquiry, setSupplementaryInquiry] = useState(
-    existingReview?.supplementaryInquiry ?? ''
+    traditionalApi ? '' : existingReview?.supplementaryInquiry ?? ''
   );
+  const [returnReason, setReturnReason] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const effectiveNurseAnswers =
-    Object.keys(nurseAnswers).length > 0 ? nurseAnswers : sourceAnswers;
+  const effectiveNurseAnswers = { ...sourceAnswers, ...nurseAnswers };
+  const canReview = !traditionalApi || questionnaire?.status === 'submitted';
+  const traditional = task?.collectionMode === 'traditional_form';
 
   if (!task) {
     return <NurseLayout><Card padding="lg">任务不存在</Card></NurseLayout>;
   }
 
-  if (questionnaireLoading) {
-    return <NurseLayout><Card padding="lg">正在加载问卷提交结果…</Card></NurseLayout>;
+  if (traditionalApi && !questionnaire) {
+    return (
+      <NurseLayout>
+        <Card padding="lg" role={questionnaireError ? 'alert' : 'status'}>
+          {questionnaireError || '正在加载问卷提交结果…'}
+        </Card>
+      </NurseLayout>
+    );
   }
 
   const differences = reviewQuestions.filter(
@@ -122,6 +132,11 @@ export default function NurseReviewPage() {
   );
 
   const persistReview = async (status: AssessmentReview['status']) => {
+    if (submitting || !canReview) return;
+    if (traditional && status === 'returned' && !returnReason.trim()) {
+      setError('请填写给患者的退回原因');
+      return;
+    }
     const missingReason = differences.find((question) => !reasons[question.id]?.trim());
     if (status === 'confirmed' && missingReason) {
       setError(`请填写“${missingReason.questionText}”的修改原因`);
@@ -133,10 +148,13 @@ export default function NurseReviewPage() {
       finalAnswers: effectiveNurseAnswers,
       correctionReasons: reasons,
       supplementaryInquiry,
+      returnReason: status === 'returned' && traditional ? returnReason.trim() : undefined,
+      expectedSubmissionId: questionnaire?.submissionId,
       status,
       reviewedAt: new Date().toISOString(),
     };
     setSubmitting(true);
+    setError('');
     try {
       await careRepository.submitAssessmentReview(review);
       saveReview(review);
@@ -199,6 +217,16 @@ export default function NurseReviewPage() {
         </Card>
       ) : null}
 
+      {!canReview && (
+        <Card padding="md" className="mb-4">
+          <p role="status">
+            {questionnaire?.status === 'returned' ? '已退回，等待患者重新提交。'
+              : questionnaire?.status === 'confirmed' ? '本次问卷已复核。'
+                : '患者提交后可开始复核。'}
+          </p>
+        </Card>
+      )}
+
       <div className="space-y-4">
         {reviewQuestions.map((question) => {
           const source = sourceAnswers[question.id] ?? '';
@@ -219,7 +247,7 @@ export default function NurseReviewPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="rounded-xl bg-surface-secondary p-4">
                   <p className="text-xs text-foreground-muted">
-                    {task.collectionMode === 'ai_dialogue' ? 'AI结构化答案' : '患者提交答案'}
+                    {task.collectionMode === 'ai_dialogue' ? 'AI结构化答案' : canReview ? '患者提交答案' : '患者答卷'}
                   </p>
                   <p className="font-medium mt-2">{source || '未采集'}</p>
                   {sourceMessages?.length && (
@@ -235,6 +263,7 @@ export default function NurseReviewPage() {
                   <label className="text-xs text-foreground-muted">护士独立确认答案</label>
                   <input
                     value={nurse}
+                    disabled={!canReview}
                     onChange={(event) =>
                       setNurseAnswers((current) => ({
                         ...current,
@@ -246,6 +275,7 @@ export default function NurseReviewPage() {
                   {different && (
                     <input
                       value={reasons[question.id] ?? ''}
+                      disabled={!canReview}
                       onChange={(event) =>
                         setReasons((current) => ({
                           ...current,
@@ -270,24 +300,39 @@ export default function NurseReviewPage() {
         </Card>
       )}
 
-      <Card padding="lg" className="mt-5">
-        <label className="font-medium">护士补充问诊摘要</label>
+      {canReview && <Card padding="lg" className="mt-5">
+        <label className="font-medium" htmlFor="supplementary-inquiry">护士补充问诊摘要</label>
         <textarea
+          id="supplementary-inquiry"
           value={supplementaryInquiry}
           onChange={(event) => setSupplementaryInquiry(event.target.value)}
           rows={4}
           className="w-full mt-2 rounded-xl border border-border p-3"
           placeholder="记录护士补问内容、患者补充说明和临床判断依据"
         />
-      </Card>
+        {traditional && (
+          <div className="mt-4">
+            <label className="font-medium" htmlFor="return-reason">给患者的退回原因</label>
+            <textarea
+              id="return-reason"
+              value={returnReason}
+              onChange={(event) => setReturnReason(event.target.value)}
+              rows={3}
+              maxLength={1000}
+              className="mt-2 w-full rounded-xl border border-border p-3"
+              placeholder="说明哪一项需要补充及如何填写。退回后患者可见。"
+            />
+          </div>
+        )}
+      </Card>}
 
       {error && (
-        <div className="mt-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+        <div role="alert" className="mt-4 rounded-xl bg-red-50 border border-red-200 p-3 text-sm text-red-700">
           {error}
         </div>
       )}
 
-      <div className="mt-5 flex flex-col sm:flex-row justify-end gap-3">
+      {canReview && <div className="mt-5 flex flex-col sm:flex-row justify-end gap-3">
         <Button
           variant="outline"
           disabled={submitting}
@@ -300,7 +345,7 @@ export default function NurseReviewPage() {
           disabled={submitting}
           onClick={() => void persistReview('returned')}
         >
-          退回患者重评
+          {traditional ? '退回补录' : '退回患者重评'}
         </Button>
         <Button
           loading={submitting}
@@ -310,7 +355,7 @@ export default function NurseReviewPage() {
           <CheckCircleIcon className="w-5 h-5 mr-2" />
           确认最终结果
         </Button>
-      </div>
+      </div>}
     </NurseLayout>
   );
 }

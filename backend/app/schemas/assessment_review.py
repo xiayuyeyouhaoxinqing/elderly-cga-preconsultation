@@ -15,4 +15,6 @@ class AssessmentReviewRequest(BaseModel):
     final_answers: dict[str, str] = Field(default_factory=dict)
     correction_reasons: dict[str, str] = Field(default_factory=dict)
     supplementary_inquiry: str = Field(default="", max_length=4000)
+    return_reason: str | None = Field(default=None, max_length=1000)
+    expected_submission_id: int | None = Field(default=None, gt=0)
     status: Literal["draft", "returned", "confirmed"]

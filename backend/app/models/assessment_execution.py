@@ -235,6 +235,7 @@ class AssessmentReview(BusinessBaseMixin, Base):
     reviewer_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
     review_status: Mapped[str] = mapped_column(String(32), nullable=False)
     supplementary_inquiry: Mapped[str | None] = mapped_column(Text, nullable=True)
+    return_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     correction_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
