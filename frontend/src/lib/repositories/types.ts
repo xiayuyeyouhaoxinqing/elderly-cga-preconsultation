@@ -82,6 +82,7 @@ export interface PatientRecordInput {
 export interface PatientLoginInput {
   idCardNo: string;
   phone: string;
+  encounterKind?: 'inpatient' | 'outpatient';
 }
 
 export interface PatientTaskVerifyInput {

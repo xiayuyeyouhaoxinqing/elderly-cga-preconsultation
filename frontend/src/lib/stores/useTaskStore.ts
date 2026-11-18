@@ -42,6 +42,7 @@ interface TaskStore {
   ) => void;
   resolveHandoff: (taskId: string) => void;
   resetDemoData: () => void;
+  clearSessionData: () => void;
 }
 
 const initialState = {
@@ -216,6 +217,7 @@ export const useTaskStore = create<TaskStore>()(
         })),
 
       resetDemoData: () => set({ ...initialState, tasks: [...mockTasks] }),
+      clearSessionData: () => set({ ...initialState, tasks: [] }),
     }),
     {
       name: 'medical-evaluate-task-storage',

@@ -550,6 +550,7 @@ export class ApiCareRepository implements CareRepository {
         body: {
           id_card_no: input.idCardNo,
           phone: input.phone,
+          encounter_kind: input.encounterKind,
         },
         signal,
       }

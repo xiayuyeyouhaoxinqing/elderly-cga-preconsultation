@@ -15,6 +15,7 @@ from app.models.base import get_db
 from app.models.staff_account import StaffAccount
 from app.schemas.patient import (
     InHospitalPatientDto,
+    OutpatientEncounterRequest,
     PatientCreateRequest,
     PatientLoginRequest,
     PatientLoginResponse,
@@ -26,6 +27,30 @@ from app.schemas.task import BackendTaskDto
 from app.services import patient_service
 
 router = APIRouter(prefix="/api/patients", tags=["patients"])
+
+
+@router.post(
+    "/{patient_id}/outpatient-encounters",
+    response_model=ApiResponse[PatientRecordDto],
+    summary="登记门诊评估",
+)
+def register_outpatient(
+    patient_id: int,
+    req: OutpatientEncounterRequest,
+    db: Annotated[Session, Depends(get_db)],
+    staff: Annotated[StaffAccount, Depends(require_staff)],
+) -> dict:
+    return ok(patient_service.register_outpatient(db, patient_id, req, operator=staff.staff_no))
+
+
+@router.post("/outpatient-encounters/{encounter_id}/close", summary="结束门诊评估")
+def close_outpatient(
+    encounter_id: int,
+    db: Annotated[Session, Depends(get_db)],
+    staff: Annotated[StaffAccount, Depends(require_staff)],
+) -> dict:
+    patient_service.close_outpatient(db, encounter_id, operator=staff.staff_no)
+    return ok()
 
 
 @router.get(
@@ -129,7 +154,7 @@ def get_current_patient(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict:
-    """获取当前患者住院信息和本人任务。"""
+    """获取当前会话绑定的就诊信息和本人任务。"""
     return ok(patient_service.get_patient_portal(db, request))
 
 
@@ -142,7 +167,7 @@ def list_current_patient_tasks(
     request: Request,
     db: Annotated[Session, Depends(get_db)],
 ) -> dict:
-    """获取当前患者当前住院记录下的护理任务。"""
+    """获取当前会话绑定的本人评估任务。"""
     portal = patient_service.get_patient_portal(db, request)
     return ok(portal.tasks)
 

@@ -32,7 +32,18 @@ def require_patient(
     request: Request,
     db: DbSession,
 ) -> tuple[Patient, PatientEncounter]:
-    """要求当前请求具备有效患者会话。"""
+    """旧住院功能只接收在院会话。"""
+    patient, encounter = require_assessment_patient(request, db)
+    if encounter.encounter_status != "在院":
+        raise AppError(ErrorCode.ERR_PATIENT_009, "该功能暂未向门诊评估开放", http_status=403)
+    return patient, encounter
+
+
+def require_assessment_patient(
+    request: Request,
+    db: DbSession,
+) -> tuple[Patient, PatientEncounter]:
+    """允许已实现就诊隔离的评估端点使用门诊会话。"""
     return patient_service.get_patient_context(db, request)
 
 
@@ -45,6 +56,20 @@ def require_staff_or_patient(
     两类会话使用不同 Cookie；优先读取医护会话，便于护士端在同一浏览器中
     监控患者对话。
     """
+    return _staff_or_patient(request, db, allow_outpatient=False)
+
+
+def require_staff_or_assessment_patient(
+    request: Request,
+    db: DbSession,
+) -> StaffAccount | tuple[Patient, PatientEncounter]:
+    """允许职工及按当前就诊授权的患者访问传统问卷。"""
+    return _staff_or_patient(request, db, allow_outpatient=True)
+
+
+def _staff_or_patient(
+    request: Request, db: Session, *, allow_outpatient: bool
+) -> StaffAccount | tuple[Patient, PatientEncounter]:
     staff_cookie = request.cookies.get(
         get_app_config().security.staff_session_cookie
     )
@@ -54,4 +79,6 @@ def require_staff_or_patient(
         except AppError as exc:
             if exc.code != ErrorCode.ERR_STAFF_002:
                 raise
-    return patient_service.get_patient_context(db, request)
+    if allow_outpatient:
+        return require_assessment_patient(request, db)
+    return require_patient(request, db)

@@ -12,6 +12,14 @@ from pydantic import BaseModel, Field
 from app.schemas.task import BackendTaskDto
 
 EncounterStatus = Literal["待入院", "在院", "已出院", "取消"]
+OUTPATIENT_ACTIVE = "门诊评估中"
+OUTPATIENT_CLOSED = "门诊评估结束"
+
+
+class OutpatientEncounterRequest(BaseModel):
+    """为已建档患者登记门诊评估。"""
+
+    department_name: str = Field(..., min_length=1, max_length=128, pattern=r"\S")
 
 
 class PatientDto(BaseModel):
@@ -161,6 +169,7 @@ class PatientLoginRequest(BaseModel):
 
     id_card_no: str = Field(..., min_length=6, max_length=32)
     phone: str = Field(..., min_length=6, max_length=32)
+    encounter_kind: Literal["inpatient", "outpatient"] | None = None
 
 
 class PatientLoginResponse(BaseModel):
