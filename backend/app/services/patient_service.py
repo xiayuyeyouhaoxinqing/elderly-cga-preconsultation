@@ -139,6 +139,7 @@ def list_patients(
     encounter_status: str | None = None,
     department_name: str | None = None,
     ward_name: str | None = None,
+    patient_id: int | None = None,
 ) -> list[PatientRecordDto]:
     """查询医护端患者列表并支持院内常用筛选。"""
     statement = (
@@ -150,6 +151,8 @@ def list_patients(
         statement = statement.where(
             PatientEncounter.encounter_status == encounter_status
         )
+    if patient_id is not None:
+        statement = statement.where(Patient.id == patient_id)
     if department_name:
         statement = statement.where(
             PatientEncounter.department_name == department_name
@@ -188,7 +191,7 @@ def list_in_hospital_patients(db: Session) -> list[InHospitalPatientDto]:
 
 
 def get_patient_record(db: Session, patient_id: int) -> PatientRecordDto:
-    """查询患者及最近一次住院记录。"""
+    """保留最近住院记录供编辑，无住院记录时返回最近门诊记录。"""
     row = db.execute(
         select(Patient, PatientEncounter)
         .join(PatientEncounter, PatientEncounter.patient_id == Patient.id)
@@ -198,6 +201,7 @@ def get_patient_record(db: Session, patient_id: int) -> PatientRecordDto:
             PatientEncounter.deleted == 0,
         )
         .order_by(
+            PatientEncounter.encounter_status.in_((OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED)),
             PatientEncounter.admission_time.desc(),
             PatientEncounter.id.desc(),
         )

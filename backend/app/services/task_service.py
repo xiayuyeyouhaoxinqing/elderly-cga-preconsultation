@@ -217,13 +217,16 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
         select(PatientEncounter).where(
             PatientEncounter.id == req.encounter_id,
             PatientEncounter.deleted == 0,
-        )
+        ).with_for_update()
     )
     if encounter is None or encounter.patient_id != patient.id:
         raise AppError(ErrorCode.ERR_TASK_002)
     if encounter.encounter_status == OUTPATIENT_CLOSED:
         raise AppError(ErrorCode.ERR_TASK_002, "该门诊评估已结束")
-    if encounter.encounter_status == OUTPATIENT_ACTIVE and (
+    is_outpatient = encounter.encounter_status == OUTPATIENT_ACTIVE
+    if req.assessment_scene == "outpatient" and not is_outpatient:
+        raise AppError(ErrorCode.ERR_TASK_002, "请选择进行中的门诊评估")
+    if is_outpatient and (
         req.collection_mode != "traditional_form" or req.participant_type != "patient"
     ):
         raise AppError(
@@ -246,7 +249,7 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
         patient_id=patient.id,
         encounter_id=encounter.id,
         task_type=req.task_type,
-        task_name=req.task_name,
+        task_name="门诊量表评估" if is_outpatient and req.task_name == "入院量表评估" else req.task_name,
         task_source=req.task_source,
         collection_mode=req.collection_mode,
         task_status="in_progress" if req.collection_mode == "ai_dialogue" else "pending",
@@ -288,7 +291,7 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
                     encounter=encounter,
                     scale=scale,
                     version=version,
-                    assessment_scene=req.assessment_scene,
+                    assessment_scene="outpatient" if is_outpatient else req.assessment_scene,
                     started_at=now,
                 )
             )

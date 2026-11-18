@@ -40,8 +40,9 @@ export interface PatientTaskSummary {
 }
 
 export interface PatientListFilters {
+  patientId?: string;
   keyword?: string;
-  status?: '待入院' | '在院' | '已出院' | '取消' | '';
+  status?: '待入院' | '在院' | '已出院' | '取消' | '门诊评估中' | '门诊评估结束' | '';
   departmentName?: string;
   wardName?: string;
 }
@@ -211,6 +212,8 @@ export interface CareRepository {
     signal?: AbortSignal
   ): Promise<PatientWithEncounter[]>;
   listInHospitalPatients(signal?: AbortSignal): Promise<PatientWithEncounter[]>;
+  registerOutpatient(patientId: string, departmentName: string): Promise<PatientWithEncounter>;
+  closeOutpatient(encounterId: string): Promise<void>;
   getPatient(
     patientId: string,
     signal?: AbortSignal

@@ -68,6 +68,7 @@ def list_patients(
     ] = "在院",
     department_name: Annotated[str | None, Query(max_length=128)] = None,
     ward_name: Annotated[str | None, Query(max_length=128)] = None,
+    patient_id: Annotated[int | None, Query(gt=0)] = None,
 ) -> dict:
     """按关键字、科室、病区和住院状态查询患者。"""
     return ok(
@@ -77,6 +78,7 @@ def list_patients(
             encounter_status=encounter_status,
             department_name=department_name,
             ward_name=ward_name,
+            patient_id=patient_id,
         )
     )
 

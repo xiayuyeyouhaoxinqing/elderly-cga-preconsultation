@@ -342,7 +342,7 @@ function buildTaskFallback(
     bedNo: input.encounter.bedNo,
     department: input.encounter.department,
     wardName: input.encounter.ward,
-    taskType: '入院评估任务包',
+    taskType: input.assessmentScene === 'outpatient' ? '门诊评估任务' : '入院评估任务包',
     collectionMode: input.collectionMode,
     taskStatus: response.status ?? 'pending',
     assignedNurseId: input.nurseId,
@@ -370,6 +370,7 @@ export class ApiCareRepository implements CareRepository {
     signal?: AbortSignal
   ): Promise<PatientWithEncounter[]> {
     const query = new URLSearchParams();
+    if (filters.patientId) query.set('patient_id', filters.patientId);
     if (filters.keyword) query.set('keyword', filters.keyword);
     if (filters.status !== undefined) query.set('status', filters.status);
     if (filters.departmentName) {
@@ -400,6 +401,21 @@ export class ApiCareRepository implements CareRepository {
       { signal }
     );
     return mapPatientRecord(response);
+  }
+
+  async registerOutpatient(patientId: string, departmentName: string) {
+    const record = await apiRequest<PatientRecordDto>(
+      `/api/patients/${encodeURIComponent(patientId)}/outpatient-encounters`,
+      { method: 'POST', body: { department_name: departmentName } }
+    );
+    return mapPatientRecord(record);
+  }
+
+  async closeOutpatient(encounterId: string) {
+    await apiRequest<null>(
+      `/api/patients/outpatient-encounters/${encodeURIComponent(encounterId)}/close`,
+      { method: 'POST' }
+    );
   }
 
   async createPatient(input: PatientRecordInput, signal?: AbortSignal) {

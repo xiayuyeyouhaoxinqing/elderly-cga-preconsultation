@@ -13,6 +13,7 @@ from sqlalchemy import select, text
 from app.configs.app_config import get_app_config
 from app.main import create_app
 from app.models import base as model_base
+from app.models.assessment_template import AssessmentScale, AssessmentScaleVersion
 from app.models.patient_task import Patient, PatientEncounter
 from app.models.staff_account import StaffAccount
 from app.schemas.patient import OUTPATIENT_ACTIVE
@@ -47,8 +48,19 @@ def test_live_outpatient_registration_lock_and_session():
                 role_code="nurse", account_status="启用", password_hash=hash_password(password),
             )
             db.add_all([patient, staff])
+            scale = AssessmentScale(
+                scale_code=f"LIVE-{suffix}", scale_name="联调量表",
+                scale_type="评估", status="启用",
+            )
+            db.add(scale)
+            db.flush()
+            db.add(AssessmentScaleVersion(
+                scale_id=scale.id, version_code="v1", version_name="联调版本",
+                publish_status="已发布", scale_snapshot={}, content_hash=suffix,
+            ))
             db.commit()
             patient_id, staff_no = patient.id, staff.staff_no
+            scale_id = scale.id
 
         register = f"/api/patients/{patient_id}/outpatient-encounters"
         payload = {"department_name": "老年医学科"}
@@ -97,6 +109,24 @@ def test_live_outpatient_registration_lock_and_session():
             encounter_id = encounters[0].id
             assert encounters[0].inpatient_no is None
 
+        filtered_list = client.get("/api/patients", params={
+            "patient_id": patient_id, "status": OUTPATIENT_ACTIVE,
+        })
+        assert filtered_list.status_code == 200
+        assert [row["encounter"]["id"] for row in filtered_list.json()["data"]] == [encounter_id]
+        task_payload = {
+            "patient_id": patient_id, "encounter_id": encounter_id,
+            "scale_ids": [scale_id], "assessment_scene": "outpatient",
+            "collection_mode": "traditional_form", "participant_type": "patient",
+        }
+        assert client.post("/api/tasks", json={
+            **task_payload, "collection_mode": "ai_dialogue",
+        }).status_code == 404
+        created_task = client.post("/api/tasks", json=task_payload)
+        assert created_task.status_code == 200, created_task.text
+        task = created_task.json()["data"]["task"]
+        assert task["assessment_scene"] == "outpatient"
+
         login = client.post("/api/patients/login", json=credentials)
         assert login.status_code == 200
         assert "httponly" in login.headers["set-cookie"].lower()
@@ -104,8 +134,14 @@ def test_live_outpatient_registration_lock_and_session():
         key = f"patient_auth:{patient_cookie}"
         assert get_redis().get(key) == {"patient_id": patient_id, "encounter_id": encounter_id}
         assert get_redis().client.ttl(key) > 0
-        assert client.get("/api/patients/me/tasks").status_code == 200
+        patient_tasks = client.get("/api/patients/me/tasks")
+        assert patient_tasks.status_code == 200
+        assert [row["task_id"] for row in patient_tasks.json()["data"]] == [task["task_id"]]
         assert client.post(f"/api/patients/outpatient-encounters/{encounter_id}/close").status_code == 200
+        assert client.get("/api/patients", params={
+            "patient_id": patient_id, "status": OUTPATIENT_ACTIVE,
+        }).json()["data"] == []
+        assert client.post("/api/tasks", json=task_payload).status_code == 404
         assert client.get("/api/patients/me/tasks").status_code == 401
         assert client.post("/api/patients/logout").status_code == 200
         assert get_redis().get(key) is None

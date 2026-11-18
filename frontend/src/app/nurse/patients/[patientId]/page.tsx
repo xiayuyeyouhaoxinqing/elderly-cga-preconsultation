@@ -7,6 +7,7 @@ import NurseLayout from '@/components/layout/NurseLayout';
 import { Badge } from '@/components/shared/Badge';
 import { Button } from '@/components/shared/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/shared/Card';
+import { Input } from '@/components/shared/Input';
 import TaskCard from '@/components/task/TaskCard';
 import { abortRequest, isRequestCancelled } from '@/lib/api/httpClient';
 import { careRepository } from '@/lib/repositories';
@@ -29,6 +30,8 @@ import {
 function statusPresentation(
   status: PatientWithEncounter['encounter']['encounterStatus']
 ) {
+  if (status === 'outpatient_active') return { label: '门诊评估中', variant: 'success' as const };
+  if (status === 'outpatient_closed') return { label: '门诊评估结束', variant: 'default' as const };
   if (status === 'in_hospital') {
     return { label: '在院', variant: 'success' as const };
   }
@@ -53,6 +56,11 @@ export default function NursePatientDetailPage() {
   const [record, setRecord] = useState<PatientWithEncounter>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [outpatient, setOutpatient] = useState<PatientWithEncounter>();
+  const [department, setDepartment] = useState('');
+  const [outpatientBusy, setOutpatientBusy] = useState(false);
+  const [outpatientError, setOutpatientError] = useState('');
+  const [confirmClose, setConfirmClose] = useState(false);
   const tasks = useMemo(
     () => allTasks.filter((task) => task.patientId === patientId),
     [allTasks, patientId]
@@ -61,9 +69,16 @@ export default function NursePatientDetailPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     const controller = new AbortController();
-    void careRepository
-      .getPatient(patientId, controller.signal)
-      .then(setRecord)
+    void Promise.all([
+      careRepository.getPatient(patientId, controller.signal),
+      careRepository.listPatients({ patientId, status: '门诊评估中' }, controller.signal),
+    ])
+      .then(([patientRecord, activeVisits]) => {
+        if (controller.signal.aborted) return;
+        setRecord(patientRecord);
+        setOutpatient(activeVisits[0]);
+        setDepartment(patientRecord.encounter.department);
+      })
       .catch((loadError) => {
         if (!isRequestCancelled(loadError)) {
           setError(
@@ -79,6 +94,38 @@ export default function NursePatientDetailPage() {
     return () => abortRequest(controller);
   }, [isAuthenticated, patientId]);
 
+  async function saveOutpatient(event: React.FormEvent) {
+    event.preventDefault();
+    if (outpatientBusy || !department.trim()) return;
+    setOutpatientBusy(true);
+    setOutpatientError('');
+    try {
+      setOutpatient(await careRepository.registerOutpatient(patientId, department.trim()));
+    } catch (failure) {
+      setOutpatientError(failure instanceof Error ? failure.message : '门诊登记失败');
+    } finally {
+      setOutpatientBusy(false);
+    }
+  }
+
+  async function endOutpatient() {
+    if (outpatientBusy || !outpatient) return;
+    setOutpatientBusy(true);
+    setOutpatientError('');
+    try {
+      await careRepository.closeOutpatient(outpatient.encounter.id);
+      setOutpatient(undefined);
+      setConfirmClose(false);
+      setRecord((current) => current?.encounter.id === outpatient.encounter.id
+        ? { ...current, encounter: { ...current.encounter, encounterStatus: 'outpatient_closed' } }
+        : current);
+    } catch (failure) {
+      setOutpatientError(failure instanceof Error ? failure.message : '结束门诊失败');
+    } finally {
+      setOutpatientBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <NurseLayout>
@@ -93,7 +140,7 @@ export default function NursePatientDetailPage() {
     return (
       <NurseLayout>
         <Card padding="lg" className="text-center text-danger">
-          {error || '患者住院记录不存在'}
+          {error || '患者就诊记录不存在'}
         </Card>
       </NurseLayout>
     );
@@ -101,6 +148,7 @@ export default function NursePatientDetailPage() {
 
   const { patient, encounter, taskSummary } = record;
   const status = statusPresentation(encounter.encounterStatus);
+  const isOutpatientRecord = encounter.encounterStatus.startsWith('outpatient_');
 
   return (
     <NurseLayout>
@@ -132,14 +180,14 @@ export default function NursePatientDetailPage() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Link href={`/nurse/patients/${patient.id}/edit`}>
+          {!isOutpatientRecord && <Link href={`/nurse/patients/${patient.id}/edit`}>
             <Button variant="outline" className="w-full sm:w-auto">
               <PencilSquareIcon className="mr-2 h-5 w-5" />
               编辑患者
             </Button>
-          </Link>
+          </Link>}
           {encounter.encounterStatus === 'in_hospital' && (
-            <Link href={`/nurse/tasks/create?patientId=${patient.id}`}>
+            <Link href={`/nurse/tasks/create?encounterId=${encodeURIComponent(encounter.id)}`}>
               <Button className="w-full sm:w-auto">
                 <PlusIcon className="mr-2 h-5 w-5" />
                 创建评估任务
@@ -149,8 +197,41 @@ export default function NursePatientDetailPage() {
         </div>
       </div>
 
+      <Card padding="lg" className="mb-5">
+        <CardHeader><CardTitle>门诊评估</CardTitle></CardHeader>
+        <CardContent>
+          {outpatient ? (
+            <div className="space-y-3">
+              <p><Badge variant="success">门诊评估中</Badge> {outpatient.encounter.department} · {outpatient.encounter.encounterNo}</p>
+              <div className="flex flex-wrap gap-2">
+                {!confirmClose && <>
+                  <Link
+                    href={`/nurse/tasks/create?encounterId=${encodeURIComponent(outpatient.encounter.id)}`}
+                    className="inline-flex min-h-11 items-center rounded-full bg-primary px-5 py-2.5 font-medium text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                  >
+                    创建门诊评估任务
+                  </Link>
+                  <Button type="button" variant="outline" onClick={() => setConfirmClose(true)}>结束门诊评估</Button>
+                </>}
+                {confirmClose && <>
+                  <p className="w-full text-sm">结束后，患者将无法继续访问本次评估。</p>
+                  <Button type="button" variant="danger" loading={outpatientBusy} onClick={endOutpatient}>确认结束</Button>
+                  <Button type="button" variant="outline" disabled={outpatientBusy} onClick={() => setConfirmClose(false)}>取消</Button>
+                </>}
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={saveOutpatient} className="flex max-w-lg flex-wrap items-end gap-3">
+              <Input label="门诊科室" value={department} onChange={(event) => setDepartment(event.target.value)} maxLength={128} required />
+              <Button type="submit" loading={outpatientBusy} disabled={!department.trim()}>登记门诊评估</Button>
+            </form>
+          )}
+          {outpatientError && <p className="mt-2 text-sm text-danger" role="alert">{outpatientError}</p>}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <Card padding="lg" className="lg:col-span-2">
+        {!isOutpatientRecord && <Card padding="lg" className="lg:col-span-2">
           <CardHeader>
             <CardTitle>本次住院信息</CardTitle>
           </CardHeader>
@@ -213,7 +294,7 @@ export default function NursePatientDetailPage() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card padding="lg">
           <CardHeader>
