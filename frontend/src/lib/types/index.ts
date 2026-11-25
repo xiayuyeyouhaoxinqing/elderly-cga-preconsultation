@@ -114,6 +114,17 @@ export interface TaskPreparation {
 }
 
 // 护理任务
+export type AssessmentConsentStatus = 'pending' | 'agreed' | 'declined';
+
+export interface AssessmentConsent {
+  recordId: string;
+  title: string;
+  version: string;
+  fullText: string;
+  status: AssessmentConsentStatus;
+  decidedAt?: string;
+}
+
 export interface CareTask {
   id: string;
   taskNo: string;
@@ -147,6 +158,7 @@ export interface CareTask {
   relationshipToPatient?: string;
   assessmentScene?: AssessmentScene;
   consentRequired?: boolean;
+  assessmentConsentStatus?: AssessmentConsentStatus;
   educationTopics?: string[];
   plannedStartTime?: string;
   notes?: string;

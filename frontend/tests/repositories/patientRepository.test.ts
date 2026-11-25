@@ -50,6 +50,30 @@ describe('patient management repository', () => {
     vi.unstubAllGlobals();
   });
 
+  it('使用患者会话读取并提交已绑定的门诊同意文书', async () => {
+    const doc = {
+      record_id: 19,
+      title: '合成文书',
+      version: 'v1',
+      full_text: '合成测试原文',
+      status: 'pending',
+      decided_at: null,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(okResponse(doc))
+      .mockResolvedValueOnce(okResponse({ ...doc, status: 'declined' }));
+    vi.stubGlobal('fetch', fetchMock);
+    const repository = new ApiCareRepository();
+    const current = await repository.getAssessmentConsent('29');
+    expect(current).toMatchObject({ recordId: '19', version: 'v1', fullText: doc.full_text });
+    const updated = await repository.decideAssessmentConsent('29', current, 'decline');
+    expect(updated.status).toBe('declined');
+    expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe('/api/tasks/29/assessment-consent');
+    const [, request] = fetchMock.mock.calls[1];
+    expect(request).toMatchObject({ method: 'PUT', credentials: 'include' });
+    expect(JSON.parse(String(request.body))).toEqual({ record_id: '19', version: 'v1', decision: 'decline' });
+  });
+
   it('完整映射患者、住院、安全信息和任务摘要', () => {
     const record = mapPatientRecord({
       patient: {

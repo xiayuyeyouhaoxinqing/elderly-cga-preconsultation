@@ -21,6 +21,13 @@ uv run pytest tests/integ-test -v
 
 CRUD 测试使用外层事务回滚，不保留测试数据。迁移测试创建独立临时数据库，结束后自动删除。
 
+门诊电子确认联调使用一次性 PostgreSQL 和 Redis。将应用的
+`APP_DATABASE__*` 与 `APP_REDIS__*` 指向 `127.0.0.1`，数据库名以
+`cga_week2_test` 开头，Redis 使用独立端口。迁移后设置
+`TEST_WEEK2_LIVE_SERVICES=1`，运行
+`uv run pytest tests/integ-test/test_outpatient_assessment_consent.py -q`。
+该用例写入合成身份、评估任务和测试文书。
+
 Schedule Agent 与 Dialog Agent 还需要本机 Redis：
 
 ```text

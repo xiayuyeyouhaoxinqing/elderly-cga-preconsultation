@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.assessment_consent import AssessmentConsentStatus
+
 
 class CreateTaskRequest(BaseModel):
     """创建评估任务请求
@@ -101,6 +103,7 @@ class BackendTaskDto(BaseModel):
     scale_version: str | None = None
     participant_type: str | None = None
     assessment_scene: str | None = None
+    assessment_consent_status: AssessmentConsentStatus | None = None
     handoff_required: bool = False
     handoff_reason: str | None = None
     current_stage: str | None = None

@@ -170,6 +170,7 @@ export function mapTaskDto(dto: BackendTaskDto): CareTask {
     relationshipToPatient: dto.relationship_to_patient,
     assessmentScene: dto.assessment_scene,
     consentRequired: dto.consent_required,
+    assessmentConsentStatus: dto.assessment_consent_status ?? undefined,
     educationTopics: dto.education_topics,
     plannedStartTime: dto.planned_start_time,
     notes: dto.notes,

@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import PatientLayout from '@/components/layout/PatientLayout';
 import { PatientIcon } from '@/components/patient/PatientIcon';
 import { PatientState } from '@/components/patient/PatientState';
+import { PatientAssessmentConsent } from '@/components/patient/PatientAssessmentConsent';
 import { isPatientTaskReadOnly } from '@/lib/patient/taskGroups';
 import { useVerifiedPatientTasks } from '@/lib/patient/useVerifiedPatientTasks';
 
@@ -212,6 +213,8 @@ export default function PatientTaskDetailPage() {
               </button>
             )}
           </div>
+        ) : task.assessmentConsentStatus === 'pending' || task.assessmentConsentStatus === 'declined' ? (
+          <PatientAssessmentConsent key={task.id} taskId={task.id} onAgree={() => router.push(startPath)} />
         ) : (
           <button
             className="patient-primary-button w-full"

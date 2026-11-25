@@ -221,6 +221,14 @@ export default function TaskDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {task.assessmentConsentStatus && (
+                    <div>
+                      <p className="text-xs text-foreground-muted">门诊评估知情同意</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {{ pending: '待患者确认', agreed: '患者已同意', declined: '患者已拒绝，评估暂停' }[task.assessmentConsentStatus]}
+                      </p>
+                    </div>
+                  )}
                   <div className="flex items-start space-x-3">
                     <ClipboardDocumentCheckIcon className="w-5 h-5 text-foreground-muted flex-shrink-0 mt-0.5" />
                     <div className="flex-1">

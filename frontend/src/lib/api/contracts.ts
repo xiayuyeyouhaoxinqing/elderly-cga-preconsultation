@@ -272,6 +272,7 @@ export interface BackendTaskDto {
   relationship_to_patient?: string;
   assessment_scene?: AssessmentScene;
   consent_required?: boolean;
+  assessment_consent_status?: 'pending' | 'agreed' | 'declined' | null;
   education_topics?: string[];
   planned_start_time?: string;
   notes?: string;
@@ -408,6 +409,15 @@ export interface QuestionnaireScoreDto {
   total_score?: number | null;
   risk_level?: string | null;
   result_summary?: string | null;
+}
+
+export interface AssessmentConsentDto {
+  record_id: ApiId;
+  title: string;
+  version: string;
+  full_text: string;
+  status: 'pending' | 'agreed' | 'declined';
+  decided_at: string | null;
 }
 
 export interface QuestionnaireDto {

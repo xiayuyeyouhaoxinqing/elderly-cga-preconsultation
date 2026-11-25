@@ -573,6 +573,7 @@ def _consent_context(
             .join(ConsentDocument, ConsentDocument.id == ConsentDocumentVersion.consent_document_id)
             .where(
                 ConsentDocument.status == "active",
+                ConsentDocument.consent_type != "outpatient_assessment",
                 ConsentDocumentVersion.publish_status == "published",
                 ConsentDocumentVersion.deleted == 0,
                 ConsentDocument.deleted == 0,

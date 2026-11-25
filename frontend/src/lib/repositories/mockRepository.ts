@@ -443,6 +443,13 @@ function buildMockRecordFromInput(
 }
 
 export class MockCareRepository implements CareRepository {
+  async getAssessmentConsent(): ReturnType<CareRepository['getAssessmentConsent']> {
+    throw new Error('当前演示任务未绑定同意文书');
+  }
+
+  async decideAssessmentConsent(): ReturnType<CareRepository['decideAssessmentConsent']> {
+    throw new Error('当前演示任务未绑定同意文书');
+  }
   async listPatients(
     filters: PatientListFilters = {},
     signal?: AbortSignal

@@ -1,4 +1,5 @@
 import type {
+  AssessmentConsentDto,
   AssessmentScaleDto,
   BackendTaskDto,
   CreateTaskResponse,
@@ -41,6 +42,7 @@ import {
 } from '@/lib/api/mappers';
 import type {
   AssessmentScale,
+  AssessmentConsent,
   AssessmentScaleConfigSummary,
   CareTask,
   EducationMaterialConfig,
@@ -63,6 +65,17 @@ import type {
   PatientWithEncounter,
   StaffLoginInput,
 } from '@/lib/repositories/types';
+
+function mapAssessmentConsent(dto: AssessmentConsentDto): AssessmentConsent {
+  return {
+    recordId: String(dto.record_id),
+    title: dto.title,
+    version: dto.version,
+    fullText: dto.full_text,
+    status: dto.status,
+    decidedAt: dto.decided_at ?? undefined,
+  };
+}
 
 function mapEducationMaterial(
   item: EducationMaterialConfigDto
@@ -365,6 +378,22 @@ function buildTaskFallback(
 }
 
 export class ApiCareRepository implements CareRepository {
+  async getAssessmentConsent(taskId: string, signal?: AbortSignal) {
+    const response = await apiRequest<AssessmentConsentDto>(
+      `/api/tasks/${encodeURIComponent(taskId)}/assessment-consent`, { signal }
+    );
+    return mapAssessmentConsent(response);
+  }
+
+  async decideAssessmentConsent(
+    taskId: string, consent: AssessmentConsent, decision: 'agree' | 'decline'
+  ) {
+    const response = await apiRequest<AssessmentConsentDto>(
+      `/api/tasks/${encodeURIComponent(taskId)}/assessment-consent`,
+      { method: 'PUT', body: { record_id: consent.recordId, version: consent.version, decision } }
+    );
+    return mapAssessmentConsent(response);
+  }
   async listPatients(
     filters: PatientListFilters = {},
     signal?: AbortSignal

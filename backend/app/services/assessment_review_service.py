@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.services.assessment_consent_service import task_consent_status
 from app.errors.codes import ErrorCode
 from app.errors.handlers import AppError
 from app.models.assessment_execution import (
@@ -127,6 +128,10 @@ def submit_assessment_review(
     )
     if not instances:
         raise AppError(ErrorCode.ERR_COMMON_001, "当前任务没有可复核的评估实例")
+    if task.collection_mode == "traditional_form" and task_consent_status(db, task.id) in {
+        "pending", "declined",
+    }:
+        raise AppError(ErrorCode.ERR_COMMON_003, "患者尚未同意本次评估", 409)
 
     nurse_submissions: list[AssessmentSubmission] = []
     final_submissions: list[AssessmentSubmission] = []
