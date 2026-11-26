@@ -1,6 +1,7 @@
 import type {
   AssessmentConsentDto,
   AssessmentScaleDto,
+  AssistanceAuthorizationDto,
   BackendTaskDto,
   CreateTaskResponse,
   DialogHistoryResponse,
@@ -44,6 +45,8 @@ import type {
   AssessmentScale,
   AssessmentConsent,
   AssessmentScaleConfigSummary,
+  AssistanceAuthorization,
+  AssistanceAuthorizationInput,
   CareTask,
   EducationMaterialConfig,
   InteractionRuleConfig,
@@ -74,6 +77,24 @@ function mapAssessmentConsent(dto: AssessmentConsentDto): AssessmentConsent {
     fullText: dto.full_text,
     status: dto.status,
     decidedAt: dto.decided_at ?? undefined,
+  };
+}
+
+function mapAssistanceAuthorization(
+  dto: AssistanceAuthorizationDto
+): AssistanceAuthorization {
+  return {
+    status: dto.status,
+    helperName: dto.helper_name ?? undefined,
+    helperRelation: dto.helper_relation ?? undefined,
+    helperContactMasked: dto.helper_contact_masked ?? undefined,
+    scope: dto.scope ?? [],
+    authorizedAt: dto.authorized_at ?? undefined,
+    revokedAt: dto.revoked_at ?? undefined,
+    revokeReason: dto.revoke_reason ?? undefined,
+    scopeOptions: dto.scope_options ?? [],
+    relationOptions: dto.relation_options ?? [],
+    nonAssistable: dto.non_assistable ?? [],
   };
 }
 
@@ -394,6 +415,39 @@ export class ApiCareRepository implements CareRepository {
     );
     return mapAssessmentConsent(response);
   }
+
+  async getAssistanceAuthorization(taskId: string, signal?: AbortSignal) {
+    const response = await apiRequest<AssistanceAuthorizationDto>(
+      `/api/tasks/${encodeURIComponent(taskId)}/assistance-authorization`, { signal }
+    );
+    return mapAssistanceAuthorization(response);
+  }
+
+  async authorizeAssistance(taskId: string, input: AssistanceAuthorizationInput) {
+    const response = await apiRequest<AssistanceAuthorizationDto>(
+      `/api/tasks/${encodeURIComponent(taskId)}/assistance-authorization`,
+      {
+        method: 'PUT',
+        body: {
+          helper_name: input.helperName,
+          helper_relation: input.helperRelation,
+          helper_phone: input.helperPhone || null,
+          scope: input.scope,
+          confirmed_by_patient: true,
+        },
+      }
+    );
+    return mapAssistanceAuthorization(response);
+  }
+
+  async revokeAssistance(taskId: string, reason?: string) {
+    const response = await apiRequest<AssistanceAuthorizationDto>(
+      `/api/tasks/${encodeURIComponent(taskId)}/assistance-authorization/revoke`,
+      { method: 'POST', body: { reason: reason || null } }
+    );
+    return mapAssistanceAuthorization(response);
+  }
+
   async listPatients(
     filters: PatientListFilters = {},
     signal?: AbortSignal

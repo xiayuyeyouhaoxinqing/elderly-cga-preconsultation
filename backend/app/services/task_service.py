@@ -27,13 +27,14 @@ from app.models.interaction import InteractionSession
 from app.models.patient_task import CareTask, Patient, PatientEncounter
 from app.models.staff_account import StaffAccount
 from app.schemas.patient import OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED
-from app.services.assessment_consent_service import bind_outpatient_consent, task_consent_status
 from app.schemas.task import (
     BackendTaskDto,
     CreateTaskRequest,
     CreateTaskResponse,
     TaskScaleProgressDto,
 )
+from app.services import assistance_authorization_service
+from app.services.assessment_consent_service import bind_outpatient_consent, task_consent_status
 from app.services.assessment_progress_service import (
     valid_assessment_answer_condition,
 )
@@ -554,6 +555,11 @@ def _to_backend_task_dto(db: Session, task: CareTask) -> BackendTaskDto:
         )
 
     versions = list(dict.fromkeys(version.version_code for _, _, version in scale_rows))
+    assistance_status, assistance_helper, assistance_scope = (
+        assistance_authorization_service.authorization_summary(db, task.encounter_id)
+        if encounter and encounter.encounter_status in {OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED}
+        else (None, None, [])
+    )
     return BackendTaskDto(
         id=task.id,
         task_id=task.id,
@@ -587,6 +593,9 @@ def _to_backend_task_dto(db: Session, task: CareTask) -> BackendTaskDto:
             if encounter and encounter.encounter_status in {OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED}
             else None
         ),
+        assistance_authorization_status=assistance_status,
+        assistance_helper_name=assistance_helper,
+        assistance_scope=assistance_scope,
         handoff_required=bool(session.handoff_required) if session else False,
         handoff_reason=session.handoff_reason if session else None,
         ai_summary=session.ai_summary if session else None,
@@ -614,6 +623,9 @@ def get_task(db: Session, task_ref: str, *, staff_id: int | None = None) -> Back
     result = _to_backend_task_dto(db, task)
     if staff_id is not None and task.assigned_nurse_id != staff_id:
         result.assessment_consent_status = None
+        result.assistance_authorization_status = None
+        result.assistance_helper_name = None
+        result.assistance_scope = None
     return result
 
 

@@ -1,10 +1,12 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
 import PatientLayout from '@/components/layout/PatientLayout';
 import { PatientIcon } from '@/components/patient/PatientIcon';
 import { PatientState } from '@/components/patient/PatientState';
 import { PatientAssessmentConsent } from '@/components/patient/PatientAssessmentConsent';
+import { PatientAssistanceAuthorization } from '@/components/patient/PatientAssistanceAuthorization';
 import { isPatientTaskReadOnly } from '@/lib/patient/taskGroups';
 import { useVerifiedPatientTasks } from '@/lib/patient/useVerifiedPatientTasks';
 
@@ -20,6 +22,7 @@ export default function PatientTaskDetailPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const router = useRouter();
   const { tasks, loading, loadError } = useVerifiedPatientTasks();
+  const [agreedJustNow, setAgreedJustNow] = useState(false);
   const task = tasks.find((item) => item.id === taskId);
 
   if (loading) {
@@ -213,15 +216,25 @@ export default function PatientTaskDetailPage() {
               </button>
             )}
           </div>
-        ) : task.assessmentConsentStatus === 'pending' || task.assessmentConsentStatus === 'declined' ? (
-          <PatientAssessmentConsent key={task.id} taskId={task.id} onAgree={() => router.push(startPath)} />
+        ) : (task.assessmentConsentStatus === 'pending' ||
+            task.assessmentConsentStatus === 'declined') && !agreedJustNow ? (
+          <PatientAssessmentConsent
+            key={task.id}
+            taskId={task.id}
+            onAgree={() => setAgreedJustNow(true)}
+          />
         ) : (
-          <button
-            className="patient-primary-button w-full"
-            onClick={() => router.push(startPath)}
-          >
-            {task.taskStatus === 'in_progress' ? '从上次位置继续' : '开始评估'}
-          </button>
+          <div className="space-y-4">
+            {(task.assessmentConsentStatus === 'agreed' || agreedJustNow) && (
+              <PatientAssistanceAuthorization key={`${task.id}-assistance`} taskId={task.id} />
+            )}
+            <button
+              className="patient-primary-button w-full"
+              onClick={() => router.push(startPath)}
+            >
+              {task.taskStatus === 'in_progress' ? '从上次位置继续' : '开始评估'}
+            </button>
+          </div>
         )}
       </div>
     </PatientLayout>

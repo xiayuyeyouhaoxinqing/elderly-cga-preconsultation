@@ -4,6 +4,8 @@ import type {
 import type {
   AssessmentScale,
   AssessmentConsent,
+  AssistanceAuthorization,
+  AssistanceAuthorizationInput,
   CareTask,
   ConsentProgress,
   InteractionSession,
@@ -377,6 +379,18 @@ export interface CareRepository {
   decideAssessmentConsent(
     taskId: string, consent: AssessmentConsent, decision: 'agree' | 'decline'
   ): Promise<AssessmentConsent>;
+  getAssistanceAuthorization(
+    taskId: string,
+    signal?: AbortSignal
+  ): Promise<AssistanceAuthorization>;
+  authorizeAssistance(
+    taskId: string,
+    input: AssistanceAuthorizationInput
+  ): Promise<AssistanceAuthorization>;
+  revokeAssistance(
+    taskId: string,
+    reason?: string
+  ): Promise<AssistanceAuthorization>;
   pauseDialogue(sessionId: string, signal?: AbortSignal): Promise<void>;
   resumeDialogue(sessionId: string, signal?: AbortSignal): Promise<void>;
   requestHandoff(

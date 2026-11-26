@@ -26,6 +26,28 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 
+const ASSIST_SCOPE_LABELS: Record<string, string> = {
+  history: '病史与主诉',
+  medication: '用药与过敏',
+  care_need: '照护安排',
+  adl: 'B.1 日常生活活动',
+  iadl: 'B.2 工具性日常生活活动',
+  environment: 'B.9 居家环境',
+  sensory: 'B.4-B.7 视力听力',
+  continence: 'B.11 尿失禁',
+  sleep: 'B.13 睡眠',
+  nutrition: 'B.18/B.19 营养',
+  pain_self: 'B.14 疼痛自评',
+};
+
+function describeAssistance(task: CareTask): string {
+  if (task.assistanceAuthorizationStatus === 'active') {
+    return `${task.assistanceHelperName ?? '协助人'} 正在协助`;
+  }
+  if (task.assistanceAuthorizationStatus === 'revoked') return '已撤销协助授权';
+  return '未授权协助人';
+}
+
 export default function TaskDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -227,6 +249,23 @@ export default function TaskDetailPage() {
                       <p className="mt-1 text-sm font-medium">
                         {{ pending: '待患者确认', agreed: '患者已同意', declined: '患者已拒绝，评估暂停' }[task.assessmentConsentStatus]}
                       </p>
+                    </div>
+                  )}
+                  {task.assistanceAuthorizationStatus && (
+                    <div>
+                      <p className="text-xs text-foreground-muted">家属协助授权</p>
+                      <p className="mt-1 text-sm font-medium">
+                        {describeAssistance(task)}
+                      </p>
+                      {task.assistanceAuthorizationStatus === 'active' &&
+                        task.assistanceScope?.length ? (
+                          <p className="mt-1 text-xs text-foreground-muted">
+                            可协助范围：
+                            {task.assistanceScope
+                              .map((code) => ASSIST_SCOPE_LABELS[code] ?? code)
+                              .join('、')}
+                          </p>
+                        ) : null}
                     </div>
                   )}
                   <div className="flex items-start space-x-3">

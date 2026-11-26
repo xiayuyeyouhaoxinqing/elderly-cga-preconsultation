@@ -8,6 +8,8 @@ import { getVisibleQuestions } from '@/lib/mock/assessment';
 import type {
   AssessmentScaleConfigDetail,
   AssessmentScaleConfigSummary,
+  AssistanceAuthorization,
+  AssistanceAuthorizationInput,
   CareTask,
   EducationMaterialConfig,
   InteractionRuleConfig,
@@ -442,6 +444,50 @@ function buildMockRecordFromInput(
   return { patient, encounter };
 }
 
+const mockAssistanceScopeOptions = [
+  { code: 'history', label: '病史、主诉补充与就诊经过' },
+  { code: 'medication', label: '用药、过敏及药盒等来源核对' },
+  { code: 'care_need', label: '照护安排、居住与家庭支持' },
+  { code: 'adl', label: 'B.1 基本日常生活活动能力（近况回忆）' },
+  { code: 'iadl', label: 'B.2 工具性日常生活活动能力' },
+  { code: 'environment', label: 'B.9 居家环境筛查' },
+  { code: 'sensory', label: 'B.4 至 B.7 视力听力陈述与助听设备情况' },
+  { code: 'continence', label: 'B.11 尿失禁问卷简表' },
+  { code: 'sleep', label: 'B.13 阿森斯失眠量表' },
+  { code: 'nutrition', label: 'B.18 与 B.19 营养风险及微营养评定' },
+  { code: 'pain_self', label: 'B.14 慢性疼痛数字评分（他人仅可代为读出问题）' },
+];
+
+const mockNonAssistableOptions = [
+  { code: 'cognitive', label: 'B.8 简易智力评估与画钟：必须本人现场完成' },
+  { code: 'delirium', label: 'B.21 谵妄意识模糊评估：由医务人员观察判断' },
+  { code: 'performance', label: 'B.3 简易体能状况：平衡、步速、起坐等现场测试' },
+  { code: 'professional', label: 'B.12、B.15、B.16、B.17、B.20：需专业观察或现场操作' },
+];
+
+const mockRelationOptions = ['配偶', '子女', '父母', '兄弟姐妹', '其他亲属', '照护者'];
+
+const mockAssistanceState: Record<string, AssistanceAuthorization> = {};
+
+function blankAssistanceAuthorization(): AssistanceAuthorization {
+  return {
+    status: 'none',
+    scope: [],
+    scopeOptions: mockAssistanceScopeOptions,
+    relationOptions: mockRelationOptions,
+    nonAssistable: mockNonAssistableOptions,
+  };
+}
+
+function maskDemoPhone(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return undefined;
+  return digits.length <= 4
+    ? '*'.repeat(digits.length)
+    : `${'*'.repeat(digits.length - 4)}${digits.slice(-4)}`;
+}
+
 export class MockCareRepository implements CareRepository {
   async getAssessmentConsent(): ReturnType<CareRepository['getAssessmentConsent']> {
     throw new Error('当前演示任务未绑定同意文书');
@@ -450,6 +496,60 @@ export class MockCareRepository implements CareRepository {
   async decideAssessmentConsent(): ReturnType<CareRepository['decideAssessmentConsent']> {
     throw new Error('当前演示任务未绑定同意文书');
   }
+
+  async getAssistanceAuthorization(
+    taskId: string,
+    signal?: AbortSignal
+  ): Promise<AssistanceAuthorization> {
+    await wait(signal);
+    return { ...(mockAssistanceState[taskId] ?? blankAssistanceAuthorization()) };
+  }
+
+  async authorizeAssistance(
+    taskId: string,
+    input: AssistanceAuthorizationInput
+  ): Promise<AssistanceAuthorization> {
+    const scope = mockAssistanceScopeOptions
+      .filter((option) => input.scope.includes(option.code))
+      .map((option) => option.code);
+    if (scope.length === 0) throw new Error('请至少选择一项可以协助的内容');
+    if (!mockRelationOptions.includes(input.helperRelation)) {
+      throw new Error('请选择机构确认的协助人关系');
+    }
+    const previous = mockAssistanceState[taskId];
+    const authorization: AssistanceAuthorization = {
+      ...blankAssistanceAuthorization(),
+      status: 'active',
+      helperName: input.helperName.trim(),
+      helperRelation: input.helperRelation,
+      helperContactMasked: maskDemoPhone(input.helperPhone),
+      scope,
+      authorizedAt: new Date().toISOString(),
+      revokedAt: previous?.revokedAt,
+      revokeReason: previous?.revokeReason,
+    };
+    mockAssistanceState[taskId] = authorization;
+    return { ...authorization };
+  }
+
+  async revokeAssistance(
+    taskId: string,
+    reason?: string
+  ): Promise<AssistanceAuthorization> {
+    const previous = mockAssistanceState[taskId];
+    if (!previous || previous.status !== 'active') {
+      throw new Error('当前就诊没有生效中的协助授权');
+    }
+    const authorization: AssistanceAuthorization = {
+      ...previous,
+      status: 'revoked',
+      revokedAt: new Date().toISOString(),
+      revokeReason: reason || '本人撤销授权',
+    };
+    mockAssistanceState[taskId] = authorization;
+    return { ...authorization };
+  }
+
   async listPatients(
     filters: PatientListFilters = {},
     signal?: AbortSignal

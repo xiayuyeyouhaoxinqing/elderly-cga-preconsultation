@@ -74,6 +74,87 @@ describe('patient management repository', () => {
     expect(JSON.parse(String(request.body))).toEqual({ record_id: '19', version: 'v1', decision: 'decline' });
   });
 
+  it('读取和保存门诊协助授权，联系方式只展示掩码', async () => {
+    const blank = {
+      status: 'none',
+      helper_name: null,
+      helper_relation: null,
+      helper_contact_masked: null,
+      scope: [],
+      authorized_at: null,
+      revoked_at: null,
+      revoke_reason: null,
+      scope_options: [{ code: 'history', label: '病史、主诉补充与就诊经过' }],
+      relation_options: ['配偶', '子女'],
+      non_assistable: [{ code: 'cognitive', label: 'B.8 简易智力评估与画钟：必须本人现场完成' }],
+    };
+    const active = {
+      ...blank,
+      status: 'active',
+      helper_name: '合成家属',
+      helper_relation: '子女',
+      helper_contact_masked: '*******1234',
+      scope: ['history'],
+      authorized_at: '2026-11-26T01:00:00Z',
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(okResponse(blank))
+      .mockResolvedValueOnce(okResponse(active))
+      .mockResolvedValueOnce(okResponse({
+        ...active, status: 'revoked', revoke_reason: '家属临时离开',
+      }));
+    vi.stubGlobal('fetch', fetchMock);
+    const repository = new ApiCareRepository();
+
+    const snapshot = await repository.getAssistanceAuthorization('29');
+    expect(snapshot).toMatchObject({ status: 'none', scope: [] });
+    expect(snapshot.scopeOptions[0]).toEqual({ code: 'history', label: '病史、主诉补充与就诊经过' });
+
+    const authorized = await repository.authorizeAssistance('29', {
+      helperName: '合成家属',
+      helperRelation: '子女',
+      helperPhone: '13800001234',
+      scope: ['history'],
+    });
+    expect(authorized).toMatchObject({
+      status: 'active', helperName: '合成家属', helperContactMasked: '*******1234',
+    });
+    const [, request] = fetchMock.mock.calls[1];
+    expect(request).toMatchObject({ method: 'PUT', credentials: 'include' });
+    expect(JSON.parse(String(request.body))).toEqual({
+      helper_name: '合成家属',
+      helper_relation: '子女',
+      helper_phone: '13800001234',
+      scope: ['history'],
+      confirmed_by_patient: true,
+    });
+
+    const revoked = await repository.revokeAssistance('29', '家属临时离开');
+    expect(revoked).toMatchObject({ status: 'revoked', revokeReason: '家属临时离开' });
+    expect(new URL(String(fetchMock.mock.calls[2][0])).pathname)
+      .toBe('/api/tasks/29/assistance-authorization/revoke');
+  });
+
+  it('演示模式保存协助授权并拒绝空范围', async () => {
+    const repository = new MockCareRepository();
+    const blank = await repository.getAssistanceAuthorization('mock-task-1');
+    expect(blank.status).toBe('none');
+    const active = await repository.authorizeAssistance('mock-task-1', {
+      helperName: '演示家属',
+      helperRelation: '子女',
+      helperPhone: '13800001234',
+      scope: ['history', 'adl'],
+    });
+    expect(active).toMatchObject({ status: 'active', helperName: '演示家属', scope: ['history', 'adl'] });
+    expect(active.helperContactMasked).toMatch(/^[*]+1234$/);
+    await expect(repository.authorizeAssistance('mock-task-2', {
+      helperName: '演示家属', helperRelation: '子女', scope: [],
+    })).rejects.toThrow('请至少选择一项可以协助的内容');
+    const revoked = await repository.revokeAssistance('mock-task-1');
+    expect(revoked.status).toBe('revoked');
+    expect(revoked.revokeReason).toBe('本人撤销授权');
+  });
+
   it('完整映射患者、住院、安全信息和任务摘要', () => {
     const record = mapPatientRecord({
       patient: {

@@ -125,6 +125,34 @@ export interface AssessmentConsent {
   decidedAt?: string;
 }
 
+export type AssistanceAuthorizationStatus = 'none' | 'active' | 'revoked';
+
+export interface AssistanceScopeOption {
+  code: string;
+  label: string;
+}
+
+export interface AssistanceAuthorization {
+  status: AssistanceAuthorizationStatus;
+  helperName?: string;
+  helperRelation?: string;
+  helperContactMasked?: string;
+  scope: string[];
+  authorizedAt?: string;
+  revokedAt?: string;
+  revokeReason?: string;
+  scopeOptions: AssistanceScopeOption[];
+  relationOptions: string[];
+  nonAssistable: AssistanceScopeOption[];
+}
+
+export interface AssistanceAuthorizationInput {
+  helperName: string;
+  helperRelation: string;
+  helperPhone?: string;
+  scope: string[];
+}
+
 export interface CareTask {
   id: string;
   taskNo: string;
@@ -159,6 +187,9 @@ export interface CareTask {
   assessmentScene?: AssessmentScene;
   consentRequired?: boolean;
   assessmentConsentStatus?: AssessmentConsentStatus;
+  assistanceAuthorizationStatus?: AssistanceAuthorizationStatus;
+  assistanceHelperName?: string;
+  assistanceScope?: string[];
   educationTopics?: string[];
   plannedStartTime?: string;
   notes?: string;
