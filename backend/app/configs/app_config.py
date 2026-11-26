@@ -111,6 +111,7 @@ class SecurityConfig(BaseModel):
     staff_session_ttl_seconds: int = 28800
     staff_session_cookie: str = "medical_staff_session"
     staff_session_secure: bool = False
+    outpatient_consent_document_code: str | None = None
 
 
 class LoggingConfig(BaseModel):

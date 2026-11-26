@@ -55,6 +55,8 @@ security:
   staff_session_ttl_seconds: 28800
   staff_session_cookie: medical_staff_session
   staff_session_secure: false
+  # 提供已发布的门诊评估文书编码后，新门诊任务才启用电子确认。
+  outpatient_consent_document_code: null
 
 # 日志系统
 logging:

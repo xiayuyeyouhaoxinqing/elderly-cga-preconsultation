@@ -143,6 +143,32 @@ AI 对话任务创建后会先进入后台准备流程。医护端通过任务�
 
 该接口只允许责任护士重试 `preparation.status=failed` 的原任务，不会重复创建任务。
 
+### 门诊评估电子确认
+
+`GET /api/tasks/{task_ref}/assessment-consent` 返回本次任务已绑定的文书原文、版本、记录 ID 和决定状态。当前就诊的患者本人可使用 `PUT` 向同一路径提交 `record_id`、`version` 和 `decision`（`agree` 或 `decline`）。
+
+重复提交同一个决定返回原结果。版本或决定冲突返回 409。未同意时，患者的问卷读取、保存草稿及提交均返回 403，责任职工也无法确认复核。任务详情中的 `assessment_consent_status` 表示待确认、同意或拒绝。
+
+### 门诊评估协助授权
+
+本人同意门诊评估后，可通过 `PUT /api/tasks/{task_ref}/assistance-authorization` 登记协助人：
+请求体包含 `helper_name`、`helper_relation`、可选 `helper_phone`、`scope` 列表，以及必须为
+`true` 的 `confirmed_by_patient`。关系只接受配偶、子女、父母、兄弟姐妹、其他亲属和照护者；
+`scope` 仅接受 `history`、`medication`、`care_need`、`adl`、`iadl`、`environment`、`sensory`、
+`continence`、`sleep`、`nutrition`、`pain_self`。
+
+认知、谵妄与现场操作项目不在可协助范围内，服务端直接返回 422，不依赖前端隐藏。联系方式只保存
+末四位掩码。同一就诊已有生效授权时，再次 `PUT` 会先撤销旧记录再登记新记录，历史不覆盖。
+
+`GET` 同一路径由患者本人或该任务责任护士读取，返回 `status`（`none`/`active`/`revoked`）、
+协助人、范围以及 `scope_options`、`relation_options`、`non_assistable` 说明。
+`POST /api/tasks/{task_ref}/assistance-authorization/revoke` 由患者本人或责任护士撤销，可带
+`reason`；没有生效授权时返回 409。门诊结束后患者授权写入返回 401。
+
+任务详情中的 `assistance_authorization_status`、`assistance_helper_name`、`assistance_scope`
+供职工核对当前协助情况。本次变更只登记授权与来源边界，协助人代为作答的提交来源仍按
+`assessment_submission.submitter_type` 后续接入。
+
 ### 1.3 传统问卷评估
 
 传统问卷任务创建后直接对患者可见，不创建 AI 交互会话，也不经过首问准备流程。

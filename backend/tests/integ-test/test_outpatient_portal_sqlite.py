@@ -17,6 +17,7 @@ from app.configs.app_config import get_app_config
 from app.errors.codes import ErrorCode
 from app.errors.handlers import AppError, register_exception_handlers
 from app.models.base import Base, get_db
+from app.models.patient_portal import ConsentDocument, ConsentDocumentVersion, ConsentRecord
 from app.models.patient_task import CareTask, Patient, PatientEncounter
 from app.schemas.task import BackendTaskDto
 from app.services import patient_service, task_service
@@ -39,6 +40,7 @@ def test_outpatient_login_scopes_tasks_and_rejects_closed_session(monkeypatch):
     )
     Base.metadata.create_all(engine, tables=[
         Patient.__table__, PatientEncounter.__table__, CareTask.__table__,
+        ConsentDocument.__table__, ConsentDocumentVersion.__table__, ConsentRecord.__table__,
     ])
     config = get_app_config()
     identity = "110101195507250026"

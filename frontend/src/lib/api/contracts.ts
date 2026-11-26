@@ -272,6 +272,10 @@ export interface BackendTaskDto {
   relationship_to_patient?: string;
   assessment_scene?: AssessmentScene;
   consent_required?: boolean;
+  assessment_consent_status?: 'pending' | 'agreed' | 'declined' | null;
+  assistance_authorization_status?: 'none' | 'active' | 'revoked' | null;
+  assistance_helper_name?: string | null;
+  assistance_scope?: string[] | null;
   education_topics?: string[];
   planned_start_time?: string;
   notes?: string;
@@ -408,6 +412,34 @@ export interface QuestionnaireScoreDto {
   total_score?: number | null;
   risk_level?: string | null;
   result_summary?: string | null;
+}
+
+export interface AssessmentConsentDto {
+  record_id: ApiId;
+  title: string;
+  version: string;
+  full_text: string;
+  status: 'pending' | 'agreed' | 'declined';
+  decided_at: string | null;
+}
+
+export interface AssistanceScopeOptionDto {
+  code: string;
+  label: string;
+}
+
+export interface AssistanceAuthorizationDto {
+  status: 'none' | 'active' | 'revoked';
+  helper_name: string | null;
+  helper_relation: string | null;
+  helper_contact_masked: string | null;
+  scope: string[];
+  authorized_at: string | null;
+  revoked_at: string | null;
+  revoke_reason: string | null;
+  scope_options: AssistanceScopeOptionDto[];
+  relation_options: string[];
+  non_assistable: AssistanceScopeOptionDto[];
 }
 
 export interface QuestionnaireDto {

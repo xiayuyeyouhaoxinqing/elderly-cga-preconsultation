@@ -18,7 +18,13 @@ from app.api.dependencies import (
 from app.models.base import get_db
 from app.models.patient_task import Patient, PatientEncounter
 from app.models.staff_account import StaffAccount
+from app.schemas.assessment_consent import AssessmentConsentDecision, AssessmentConsentDto
 from app.schemas.assessment_review import AssessmentReviewRequest
+from app.schemas.assistance_authorization import (
+    AssistanceAuthorizationDto,
+    AssistanceAuthorizationRequest,
+    AssistanceAuthorizationRevokeRequest,
+)
 from app.schemas.interaction_tools import (
     EducationAcknowledgeRequest,
     HandoffRequest,
@@ -35,7 +41,12 @@ from app.schemas.questionnaire import (
 )
 from app.schemas.response import ApiResponse, ok
 from app.schemas.task import BackendTaskDto, CreateTaskRequest, CreateTaskResponse
-from app.services import questionnaire_service, task_service
+from app.services import (
+    assessment_consent_service,
+    assistance_authorization_service,
+    questionnaire_service,
+    task_service,
+)
 
 router = APIRouter(prefix="/api/tasks", tags=["tasks"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -81,7 +92,7 @@ def list_staff_tasks(
 def get_task(
     task_ref: str,
     db: DbSession,
-    _: Annotated[StaffAccount, Depends(require_staff)],
+    staff: Annotated[StaffAccount, Depends(require_staff)],
 ) -> dict:
     """获取任务详情
     Args:
@@ -90,7 +101,98 @@ def get_task(
     Return:
         - BackendTaskDto: 任务详情（裸载荷）
     """
-    return ok(task_service.get_task(db, task_ref))
+    return ok(task_service.get_task(db, task_ref, staff_id=staff.id))
+
+
+AssessmentPatient = Annotated[tuple[Patient, PatientEncounter], Depends(require_assessment_patient)]
+
+
+@router.get("/{task_ref}/assessment-consent", response_model=ApiResponse[AssessmentConsentDto])
+def get_assessment_consent(task_ref: str, db: DbSession, context: AssessmentPatient) -> dict:
+    """读取本次门诊任务绑定的知情同意原文。"""
+    return ok(assessment_consent_service.patient_assessment_consent(db, task_ref, *context))
+
+
+@router.put("/{task_ref}/assessment-consent", response_model=ApiResponse[AssessmentConsentDto])
+def decide_assessment_consent(
+    task_ref: str, req: AssessmentConsentDecision, db: DbSession, context: AssessmentPatient,
+) -> dict:
+    """保存已核验患者对当前文书版本的明确决定。"""
+    return ok(assessment_consent_service.patient_assessment_consent(
+        db, task_ref, *context, decision=req,
+    ))
+
+
+@router.get(
+    "/{task_ref}/assistance-authorization",
+    response_model=ApiResponse[AssistanceAuthorizationDto],
+    summary="读取门诊评估协助授权",
+)
+def get_assistance_authorization(
+    task_ref: str,
+    db: DbSession,
+    access: Annotated[
+        StaffAccount | tuple[Patient, PatientEncounter],
+        Depends(require_staff_or_assessment_patient),
+    ],
+) -> dict:
+    """患者读取本人授权，职工读取本人负责任务的授权状态。"""
+    if isinstance(access, tuple):
+        patient, encounter = access
+        return ok(assistance_authorization_service.get_authorization(
+            db, task_ref, patient_id=patient.id, encounter_id=encounter.id,
+        ))
+    return ok(assistance_authorization_service.get_authorization(
+        db, task_ref, staff_id=access.id,
+    ))
+
+
+@router.put(
+    "/{task_ref}/assistance-authorization",
+    response_model=ApiResponse[AssistanceAuthorizationDto],
+    summary="患者授权或更换协助人",
+)
+def authorize_assistance(
+    task_ref: str,
+    req: AssistanceAuthorizationRequest,
+    db: DbSession,
+    context: AssessmentPatient,
+) -> dict:
+    """在本人已同意门诊评估后登记协助人及可协助范围。"""
+    patient, encounter = context
+    return ok(assistance_authorization_service.authorize_assistance(
+        db,
+        task_ref,
+        req,
+        patient_id=patient.id,
+        encounter_id=encounter.id,
+        encounter_status=encounter.encounter_status,
+    ))
+
+
+@router.post(
+    "/{task_ref}/assistance-authorization/revoke",
+    response_model=ApiResponse[AssistanceAuthorizationDto],
+    summary="撤销门诊评估协助授权",
+)
+def revoke_assistance(
+    task_ref: str,
+    req: AssistanceAuthorizationRevokeRequest,
+    db: DbSession,
+    access: Annotated[
+        StaffAccount | tuple[Patient, PatientEncounter],
+        Depends(require_staff_or_assessment_patient),
+    ],
+) -> dict:
+    """患者本人或责任职工撤销当前生效授权，保留撤销原因。"""
+    if isinstance(access, tuple):
+        patient, encounter = access
+        return ok(assistance_authorization_service.revoke_assistance(
+            db, task_ref, req, patient_id=patient.id, encounter_id=encounter.id,
+        ))
+    return ok(assistance_authorization_service.revoke_assistance(
+        db, task_ref, req, staff_id=access.id,
+    ))
 
 
 @router.get(
@@ -109,6 +211,7 @@ def get_questionnaire(
     """查询当前任务绑定的传统问卷及患者最新提交。"""
     if isinstance(access, tuple):
         patient, encounter = access
+        assessment_consent_service.require_assessment_consent(db, task_ref, patient, encounter)
         return ok(
             questionnaire_service.get_questionnaire(
                 db,
@@ -142,6 +245,7 @@ def save_questionnaire_draft(
 ) -> dict:
     """保存患者传统问卷草稿，支持刷新和断点续答。"""
     patient, encounter = patient_context
+    assessment_consent_service.require_assessment_consent(db, task_ref, patient, encounter)
     return ok(
         questionnaire_service.save_draft(
             db,
@@ -169,6 +273,7 @@ def submit_questionnaire(
 ) -> dict:
     """校验所有必填题并正式提交患者传统问卷。"""
     patient, encounter = patient_context
+    assessment_consent_service.require_assessment_consent(db, task_ref, patient, encounter)
     return ok(
         questionnaire_service.submit_questionnaire(
             db,

@@ -33,6 +33,8 @@ from app.schemas.task import (
     CreateTaskResponse,
     TaskScaleProgressDto,
 )
+from app.services import assistance_authorization_service
+from app.services.assessment_consent_service import bind_outpatient_consent, task_consent_status
 from app.services.assessment_progress_service import (
     valid_assessment_answer_condition,
 )
@@ -267,6 +269,8 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
     try:
         db.add(task)
         db.flush()
+        if is_outpatient:
+            bind_outpatient_consent(db, task, now=now)
         if req.collection_mode == "ai_dialogue":
             session = InteractionSession(
                 session_no=_business_no("SESS"),
@@ -299,6 +303,9 @@ def create_task(db: Session, req: CreateTaskRequest) -> CreateTaskResponse:
         db.refresh(task)
         if session is not None:
             db.refresh(session)
+    except AppError:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         logger.exception("创建评估任务事务失败")
@@ -548,6 +555,11 @@ def _to_backend_task_dto(db: Session, task: CareTask) -> BackendTaskDto:
         )
 
     versions = list(dict.fromkeys(version.version_code for _, _, version in scale_rows))
+    assistance_status, assistance_helper, assistance_scope = (
+        assistance_authorization_service.authorization_summary(db, task.encounter_id)
+        if encounter and encounter.encounter_status in {OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED}
+        else (None, None, [])
+    )
     return BackendTaskDto(
         id=task.id,
         task_id=task.id,
@@ -576,6 +588,14 @@ def _to_backend_task_dto(db: Session, task: CareTask) -> BackendTaskDto:
         scale_version=",".join(versions) if versions else None,
         participant_type=session.participant_type if session else None,
         assessment_scene=scale_rows[0][0].assessment_scene if scale_rows else None,
+        assessment_consent_status=(
+            task_consent_status(db, task.id)
+            if encounter and encounter.encounter_status in {OUTPATIENT_ACTIVE, OUTPATIENT_CLOSED}
+            else None
+        ),
+        assistance_authorization_status=assistance_status,
+        assistance_helper_name=assistance_helper,
+        assistance_scope=assistance_scope,
         handoff_required=bool(session.handoff_required) if session else False,
         handoff_reason=session.handoff_reason if session else None,
         ai_summary=session.ai_summary if session else None,
@@ -592,7 +612,7 @@ def _to_backend_task_dto(db: Session, task: CareTask) -> BackendTaskDto:
     )
 
 
-def get_task(db: Session, task_ref: str) -> BackendTaskDto:
+def get_task(db: Session, task_ref: str, *, staff_id: int | None = None) -> BackendTaskDto:
     """按任务主键或业务编号查询详情。"""
     conditions = [CareTask.task_no == task_ref]
     if task_ref.isdigit():
@@ -600,7 +620,13 @@ def get_task(db: Session, task_ref: str) -> BackendTaskDto:
     task = db.scalar(select(CareTask).where(or_(*conditions), CareTask.deleted == 0))
     if task is None:
         raise AppError(ErrorCode.ERR_TASK_003)
-    return _to_backend_task_dto(db, task)
+    result = _to_backend_task_dto(db, task)
+    if staff_id is not None and task.assigned_nurse_id != staff_id:
+        result.assessment_consent_status = None
+        result.assistance_authorization_status = None
+        result.assistance_helper_name = None
+        result.assistance_scope = None
+    return result
 
 
 def list_staff_tasks(
